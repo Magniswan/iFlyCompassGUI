@@ -1,0 +1,65 @@
+## .NET / C# / WinUI 3
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.pdb
+*.ilk
+*.aps
+*.ncb
+*.opt
+*.plg
+*.vspscc
+*.vssscc
+
+## Visual Studio
+.vs/
+.vscode/
+*.sln.docstates
+
+## MSBuild
+*.log
+*.tlog
+*.lastbuildstate
+
+## NuGet
+*.nupkg
+packages/
+project.lock.json
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## Rider / JetBrains
+.idea/
+*.sln.iml
+
+## Publish / AppX
+AppPackages/
+BundleArtifacts/
+PublishProfiles/*.pubxml.user
+
+## Runtime bundled assets (auto-downloaded by the app)
+python/
+iFlyCompass/
+
+## User config (auto-created at runtime)
+config/settings.json
+
+## Test results
+TestResults/
+
+## Agent docs
+docs/
+.trae/
+AGENTS.md
+
+## Local temp
+*.tmp
+*.temp
+
+iFlyCompassGUI.md

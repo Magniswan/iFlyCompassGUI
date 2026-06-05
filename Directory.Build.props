@@ -1,0 +1,9 @@
+<Project>
+  <!-- Common build properties for iFlyCompassGUI solution -->
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,87 @@
+<Window
+    x:Class="iFlyCompassGUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:iFlyCompassGUI.ViewModels">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="titleBar"
+            Title="iFlyCompass GUI"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested"
+            DoubleTapped="TitleBar_DoubleTapped">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="/Assets/WindowIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <NavigationView x:Name="NavView"
+                      Grid.Row="1"
+                      IsPaneOpen="True"
+                      IsBackButtonVisible="Collapsed"
+                      PaneDisplayMode="Left"
+                      IsSettingsVisible="False"
+                      Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}"
+                      SelectionChanged="NavView_SelectionChanged"
+                      OpenPaneLength="220">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="主页" Tag="Home">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE80F;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemSeparator/>
+                <NavigationViewItem Content="小说阅读器" Tag="Novel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE82D;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="视频播放器" Tag="Video">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE714;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="AI 对话配置" Tag="AI">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8BD;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="用户管理" Tag="Users">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE716;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="日志" Tag="Log">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE90A;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="关于" Tag="About">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE946;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="设置" Tag="Settings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <Frame x:Name="ContentFrame"/>
+        </NavigationView>
+
+        <Frame x:Name="WelcomeFrame"
+               Grid.Row="1"
+               Visibility="{Binding IsInstalled, Converter={StaticResource BoolNegationToVisibilityConverter}}"/>
+    </Grid>
+</Window>

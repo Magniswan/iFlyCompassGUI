@@ -1,0 +1,51 @@
+<Page
+    x:Class="iFlyCompassGUI.Views.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:iFlyCompassGUI.ViewModels">
+    
+    <ScrollViewer Background="Transparent">
+        <StackPanel Padding="32" Spacing="24" MaxWidth="800" HorizontalAlignment="Left">
+            <TextBlock Text="主页" FontSize="28" FontWeight="Bold"/>
+            
+            <Border Background="{StaticResource CardAcrylicBrush}" 
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
+                    CornerRadius="8" Padding="24">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16" ColumnSpacing="20">
+                    <Ellipse Grid.Row="0" Grid.Column="0" Width="20" Height="20" 
+                             Fill="{Binding IsRunning, Converter={StaticResource BoolToBrushConverter}}"
+                             VerticalAlignment="Center"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StatusText}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+                    
+                    <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" 
+                                Orientation="Horizontal" Spacing="24">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="版本" Opacity="0.6" FontSize="12"/>
+                            <TextBlock Text="{Binding VersionText}" FontSize="14"/>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="运行时长" Opacity="0.6" FontSize="12"/>
+                            <TextBlock Text="{Binding UptimeText}" FontSize="14"/>
+                        </StackPanel>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4">
+                        <TextBlock Text="访问地址" Opacity="0.6" FontSize="12"/>
+                        <HyperlinkButton Content="http://127.0.0.1:5002" 
+                                         Command="{Binding OpenBrowserCommand}" Padding="0"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" 
+                                Orientation="Horizontal" Spacing="12">
+                        <Button Content="{Binding IsRunning, Converter={StaticResource BoolToStartStopConverter}}" 
+                                Command="{Binding ToggleServiceCommand}" Style="{StaticResource AccentButtonStyle}" 
+                                MinWidth="120"/>
+                        <Button Content="重启服务" Command="{Binding RestartServiceCommand}" 
+                                IsEnabled="{Binding IsRunning}" MinWidth="100"/>
+                        <Button Content="打开浏览器" Command="{Binding OpenBrowserCommand}" MinWidth="100"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
