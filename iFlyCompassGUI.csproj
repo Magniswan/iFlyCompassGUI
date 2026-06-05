@@ -13,6 +13,8 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageCertificateKeyFile>Assets\certificate\iFlyCompassGUI.pfx</PackageCertificateKeyFile>
+    <PackageCertificatePassword>$(CertificatePassword)</PackageCertificatePassword>
   </PropertyGroup>
 
   <ItemGroup>

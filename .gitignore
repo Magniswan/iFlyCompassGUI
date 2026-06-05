@@ -62,4 +62,7 @@ AGENTS.md
 *.tmp
 *.temp
 
+## Certificate private keys
+*.pfx
+
 iFlyCompassGUI.md

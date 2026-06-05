@@ -45,17 +45,11 @@ jobs:
           $certPath = "$env:TEMP\iFlyCompassGUI.pfx"
           $certPassword = "${{ secrets.CERTIFICATE_PASSWORD }}"
 
-          # Inject certificate properties into csproj temporarily
-          $csproj = Get-Content "iFlyCompassGUI.csproj" -Raw
-          $csproj = $csproj -replace '</PropertyGroup>\s*<ItemGroup>', @"
-            <PackageCertificateKeyFile>$certPath</PackageCertificateKeyFile>
-            <PackageCertificatePassword>$certPassword</PackageCertificatePassword>
-          </PropertyGroup>
-          <ItemGroup>
-"@
-          Set-Content "iFlyCompassGUI.csproj" $csproj
-
-          dotnet publish -c Release -r win10-x64 --self-contained false /p:Platform=x64 /p:AppxBundle=Never
+          dotnet publish -c Release -r win10-x64 --self-contained false `
+            /p:Platform=x64 `
+            /p:AppxBundle=Never `
+            /p:PackageCertificateKeyFile="$certPath" `
+            /p:PackageCertificatePassword="$certPassword"
 
           # Find and rename the output MSIX
           $msixPath = Get-ChildItem -Path "bin\x64\Release\net8.0-windows10.0.19041.0\win10-x64\AppPackages" -Filter "*.msix" -Recurse | Select-Object -First 1
