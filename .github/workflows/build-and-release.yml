@@ -88,24 +88,24 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $repo = "${{ github.repository }}"
 
-          $appInstaller = @"
-<?xml version="1.0" encoding="utf-8"?>
-<AppInstaller
-    Uri="https://$($repo.Split('/')[0]).github.io/$($repo.Split('/')[1])/iFlyCompassGUI.appinstaller"
-    Version="$version"
-    xmlns="http://schemas.microsoft.com/appx/appinstaller/2018">
-    <MainPackage
-        Name="iFlyCompassGUI"
-        Publisher="CN=iFlyCompassGUI"
-        Version="$version"
-        ProcessorArchitecture="x64"
-        Uri="https://github.com/$repo/releases/download/$tag/iFlyCompassGUI_x64.msix" />
-    <UpdateSettings>
-        <OnLaunch HoursBetweenUpdateChecks="0" ShowPrompt="true" />
-    </UpdateSettings>
-</AppInstaller>
-"@
-          Set-Content -Path "iFlyCompassGUI.appinstaller" -Value $appInstaller
+          $lines = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<AppInstaller',
+            '    Uri="https://{0}.github.io/{1}/iFlyCompassGUI.appinstaller"' -f $repo.Split('/')[0], $repo.Split('/')[1],
+            '    Version="{0}"' -f $version,
+            '    xmlns="http://schemas.microsoft.com/appx/appinstaller/2018">',
+            '    <MainPackage',
+            '        Name="iFlyCompassGUI"',
+            '        Publisher="CN=iFlyCompassGUI"',
+            '        Version="{0}"' -f $version,
+            '        ProcessorArchitecture="x64"',
+            '        Uri="https://github.com/{0}/releases/download/{1}/iFlyCompassGUI_x64.msix" />' -f $repo, $tag,
+            '    <UpdateSettings>',
+            '        <OnLaunch HoursBetweenUpdateChecks="0" ShowPrompt="true" />',
+            '    </UpdateSettings>',
+            '</AppInstaller>'
+          )
+          Set-Content -Path "iFlyCompassGUI.appinstaller" -Value ($lines -join "`r`n")
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
