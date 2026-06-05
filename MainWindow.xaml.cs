@@ -12,7 +12,6 @@ public sealed partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly IConfigService _configService;
-    private readonly IAppUpdateService _appUpdateService;
     private readonly DispatcherHelper _dispatcherHelper;
     private readonly IDialogService _dialogService;
     public Frame MainContentFrame => ContentFrame;
@@ -23,7 +22,6 @@ public sealed partial class MainWindow : Window
         this.SystemBackdrop = new DesktopAcrylicBackdrop();
         _viewModel = (MainViewModel)((App)App.Current).Services.GetService(typeof(MainViewModel))!;
         _configService = (IConfigService)((App)App.Current).Services.GetService(typeof(IConfigService))!;
-        _appUpdateService = (IAppUpdateService)((App)App.Current).Services.GetService(typeof(IAppUpdateService))!;
         _dispatcherHelper = (DispatcherHelper)((App)App.Current).Services.GetService(typeof(DispatcherHelper))!;
         _dialogService = (IDialogService)((App)App.Current).Services.GetService(typeof(IDialogService))!;
         ((FrameworkElement)this.Content).DataContext = _viewModel;
@@ -47,7 +45,7 @@ public sealed partial class MainWindow : Window
                 ContentFrame.Navigate(typeof(HomePage));
             }
 
-            _ = CheckForGuiUpdateAsync();
+
         };
         
         Closed += OnWindowClosed;
@@ -78,32 +76,6 @@ public sealed partial class MainWindow : Window
         }
     }
     
-    private async Task CheckForGuiUpdateAsync()
-    {
-        try
-        {
-            var updateInfo = await _appUpdateService.CheckForUpdateAsync();
-            if (updateInfo == null) return;
-
-            _dispatcherHelper.RunOnUIThread(async () =>
-            {
-                var confirm = await _dialogService.ShowConfirmAsync(
-                    "发现新版本",
-                    $"iFlyCompassGUI {updateInfo.Version} 现已可用。\n\n更新内容:\n{updateInfo.Changelog}\n\n是否立即更新？"
-                );
-
-                if (confirm)
-                {
-                    ContentFrame.Navigate(typeof(AboutPage));
-                }
-            });
-        }
-        catch
-        {
-            // 静默失败，不打扰用户
-        }
-    }
-
     public void NavigateToHome()
     {
         ContentFrame.Navigate(typeof(HomePage));

@@ -10,9 +10,10 @@ public partial class App : Application
 {
     public IServiceProvider Services { get; private set; } = null!;
     public Window? MainWindowInstance { get; private set; }
-    
+
     public App()
     {
+        WinRT.ComWrappersSupport.InitializeComWrappers();
         this.InitializeComponent();
         Services = ConfigureServices();
     }
@@ -74,7 +75,6 @@ public partial class App : Application
         services.AddSingleton<IInstallService, InstallService>();
         services.AddSingleton<IUserDbService, UserDbService>();
         services.AddSingleton<IUpdateService, UpdateService>();
-        services.AddSingleton<IAppUpdateService, AppUpdateService>();
         services.AddSingleton<IFileImportService, FileImportService>();
         
         services.AddSingleton<LogViewModel>();

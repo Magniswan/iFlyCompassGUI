@@ -40,11 +40,6 @@
                              Title="发现后端新版本" Message="{Binding LatestVersion, Converter={StaticResource StringFormatConverter}, ConverterParameter='最新版本: {0}'}"
                              IsClosable="False"/>
 
-                    <!-- GUI 更新提示 -->
-                    <InfoBar IsOpen="{Binding GuiUpdateAvailable}" Severity="Success"
-                             Title="发现程序新版本" Message="{Binding GuiLatestVersion, Converter={StaticResource StringFormatConverter}, ConverterParameter='最新版本: {0}'}"
-                             IsClosable="False"/>
-
                     <StackPanel Spacing="8" Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="{Binding UpdateStageText}" FontWeight="SemiBold"/>
                         <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100"
@@ -59,10 +54,6 @@
                         <Button Content="更新后端" Command="{Binding PerformUpdateCommand}"
                                 Style="{StaticResource AccentButtonStyle}"
                                 Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
-                                IsEnabled="{Binding IsUpdating, Converter={StaticResource BoolNegationConverter}}"/>
-                        <Button Content="更新程序" Command="{Binding PerformGuiUpdateCommand}"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Visibility="{Binding GuiUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
                                 IsEnabled="{Binding IsUpdating, Converter={StaticResource BoolNegationConverter}}"/>
                     </StackPanel>
                 </StackPanel>

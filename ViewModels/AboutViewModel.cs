@@ -8,7 +8,6 @@ namespace iFlyCompassGUI.ViewModels;
 public partial class AboutViewModel : ObservableObject
 {
     private readonly IUpdateService _updateService;
-    private readonly IAppUpdateService _appUpdateService;
     private readonly IConfigService _configService;
     private readonly IDialogService _dialogService;
 
@@ -39,25 +38,11 @@ public partial class AboutViewModel : ObservableObject
     [ObservableProperty]
     private string _updateStageText = "";
 
-    [ObservableProperty]
-    private bool _guiUpdateAvailable;
-
-    [ObservableProperty]
-    private string _guiLatestVersion = "";
-
-    [ObservableProperty]
-    private string _guiChangelog = "";
-
-    [ObservableProperty]
-    private bool _isGuiUpdating;
-
     private ReleaseInfo? _latestRelease;
-    private GuiUpdateInfo? _latestGuiUpdate;
 
-    public AboutViewModel(IUpdateService updateService, IAppUpdateService appUpdateService, IConfigService configService, IDialogService dialogService)
+    public AboutViewModel(IUpdateService updateService, IConfigService configService, IDialogService dialogService)
     {
         _updateService = updateService;
-        _appUpdateService = appUpdateService;
         _configService = configService;
         _dialogService = dialogService;
     }
@@ -76,14 +61,7 @@ public partial class AboutViewModel : ObservableObject
                 UpdateAvailable = LatestVersion != CurrentVersion;
             }
 
-            // 检查 GUI 更新
-            _latestGuiUpdate = await _appUpdateService.CheckForUpdateAsync();
-            if (_latestGuiUpdate != null)
-            {
-                GuiLatestVersion = _latestGuiUpdate.Version;
-                GuiChangelog = _latestGuiUpdate.Changelog;
-                GuiUpdateAvailable = true;
-            }
+
         }
         catch (Exception ex)
         {
@@ -143,56 +121,6 @@ public partial class AboutViewModel : ObservableObject
         }
     }
     
-    [RelayCommand]
-    private async Task PerformGuiUpdateAsync()
-    {
-        if (_latestGuiUpdate == null) return;
-
-        var confirm = await _dialogService.ShowConfirmAsync("确认更新",
-            $"即将更新 iFlyCompassGUI 到 {_latestGuiUpdate.Version}，应用将关闭以完成安装。是否继续？");
-
-        if (!confirm) return;
-
-        IsGuiUpdating = true;
-        IsUpdating = true;
-        DownloadProgress = 0;
-        DownloadSpeedText = "";
-        DownloadSizeText = "";
-        UpdateStageText = "";
-
-        var progress = new Progress<DownloadProgressInfo>(info =>
-        {
-            UpdateStageText = info.Stage;
-
-            if (info.TotalBytes > 0)
-            {
-                DownloadProgress = info.ProgressPercentage;
-                DownloadSizeText = $"{FormatFileSize(info.BytesReceived)} / {FormatFileSize(info.TotalBytes)}";
-            }
-
-            if (info.SpeedBytesPerSecond > 0)
-            {
-                DownloadSpeedText = $"{FormatFileSize((long)info.SpeedBytesPerSecond)}/s";
-            }
-            else if (info.ProgressPercentage >= 100 && info.Stage == "正在下载更新包...")
-            {
-                DownloadSpeedText = "已完成";
-            }
-        });
-
-        try
-        {
-            var result = await _appUpdateService.DownloadAndInstallAsync(_latestGuiUpdate, progress);
-            UpdateStageText = "";
-            await _dialogService.ShowInfoAsync("更新结果", result.Message);
-        }
-        finally
-        {
-            IsGuiUpdating = false;
-            IsUpdating = false;
-        }
-    }
-
     private static string FormatFileSize(long bytes)
     {
         string[] units = ["B", "KB", "MB", "GB"];
