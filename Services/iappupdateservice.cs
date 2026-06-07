@@ -17,4 +17,5 @@ public class AppUpdateInfo
     public DateTime PublishedAt { get; set; }
     public string MsixDownloadUrl { get; set; } = string.Empty;
     public long MsixFileSize { get; set; }
+    public string Architecture { get; set; } = string.Empty;
 }

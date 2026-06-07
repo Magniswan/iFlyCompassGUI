@@ -254,6 +254,57 @@ public partial class UserManagerViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ExportDbAsync()
+    {
+        if (!IsDbAvailable)
+        {
+            StatusMessage = "数据库不可用，无法导出";
+            return;
+        }
+
+        try
+        {
+            var savePath = await _dialogService.ShowSaveFilePickerAsync("users.db", [".db"]);
+            if (string.IsNullOrEmpty(savePath)) return;
+
+            File.Copy(DbPath, savePath, overwrite: true);
+            StatusMessage = $"已导出到 {savePath}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"导出失败: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportDbAsync()
+    {
+        try
+        {
+            var openPath = await _dialogService.ShowOpenFilePickerAsync([".db"]);
+            if (string.IsNullOrEmpty(openPath)) return;
+
+            var confirm = await _dialogService.ShowConfirmAsync("确认导入",
+                "导入将替换当前所有用户数据，此操作不可撤销。确定要继续吗？");
+            if (!confirm) return;
+
+            var targetDir = Path.GetDirectoryName(DbPath)!;
+            if (!Directory.Exists(targetDir))
+                Directory.CreateDirectory(targetDir);
+
+            File.Copy(openPath, DbPath, overwrite: true);
+
+            CheckDbStatus();
+            await LoadUsersAsync();
+            StatusMessage = $"已从 {openPath} 导入用户数据";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"导入失败: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
     private async Task ResetPasswordAsync(UserInfo? user)
     {
         if (user == null) return;

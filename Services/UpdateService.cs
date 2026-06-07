@@ -9,11 +9,11 @@ public class UpdateService : IUpdateService
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseDir;
-    
+
     public UpdateService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _baseDir = AppContext.BaseDirectory;
+        _baseDir = PathHelper.DataDirectory;
     }
     
     public async Task<ReleaseInfo?> CheckForUpdateAsync(string repoUrl)
@@ -128,16 +128,72 @@ public class UpdateService : IUpdateService
                 var psi = new ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"-m pip install -r \"{reqFile}\" --upgrade",
+                    Arguments = $"-m pip install -r \"{reqFile}\" --upgrade --no-warn-script-location --prefer-binary",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    WorkingDirectory = targetDir
                 };
 
                 using var depProcess = new Process { StartInfo = psi };
                 depProcess.Start();
-                await depProcess.WaitForExitAsync();
+
+                // Must drain stdout/stderr to prevent deadlock when buffers fill up
+                var depOutTask = Task.Run(async () =>
+                {
+                    while (!depProcess.StandardOutput.EndOfStream)
+                        await depProcess.StandardOutput.ReadLineAsync();
+                });
+                var depErrTask = Task.Run(async () =>
+                {
+                    while (!depProcess.StandardError.EndOfStream)
+                        await depProcess.StandardError.ReadLineAsync();
+                });
+
+                await Task.WhenAll(depOutTask, depErrTask, depProcess.WaitForExitAsync());
+
+                // If batch install failed, retry each package individually
+                if (depProcess.ExitCode != 0)
+                {
+                    var lines = await File.ReadAllLinesAsync(reqFile);
+                    var packages = lines
+                        .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("#"))
+                        .ToList();
+
+                    foreach (var pkg in packages)
+                    {
+                        var p = pkg.Trim();
+                        if (string.IsNullOrEmpty(p)) continue;
+
+                        var retryPsi = new ProcessStartInfo
+                        {
+                            FileName = pythonPath,
+                            Arguments = $"-m pip install \"{p}\" --upgrade --no-warn-script-location --prefer-binary",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WorkingDirectory = targetDir
+                        };
+
+                        using var retryProcess = new Process { StartInfo = retryPsi };
+                        retryProcess.Start();
+
+                        var retryOutTask = Task.Run(async () =>
+                        {
+                            while (!retryProcess.StandardOutput.EndOfStream)
+                                await retryProcess.StandardOutput.ReadLineAsync();
+                        });
+                        var retryErrTask = Task.Run(async () =>
+                        {
+                            while (!retryProcess.StandardError.EndOfStream)
+                                await retryProcess.StandardError.ReadLineAsync();
+                        });
+
+                        await Task.WhenAll(retryOutTask, retryErrTask, retryProcess.WaitForExitAsync());
+                    }
+                }
             }
 
             progress?.Report(new DownloadProgressInfo { Stage = "正在清理..." });

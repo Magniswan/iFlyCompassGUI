@@ -13,7 +13,10 @@
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="12">
                     <TextBlock Text="iFlyCompass GUI" FontSize="24" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding CurrentVersion, Converter={StaticResource StringFormatConverter}, ConverterParameter='当前版本: {0}'}" Opacity="0.7"/>
+                    <TextBlock Opacity="0.7" FontSize="13">
+                        <Run Text="应用版本: "/><Run Text="{Binding CurrentAppVersion}"/>
+                    </TextBlock>
+                    <TextBlock Text="{Binding CurrentVersion, Converter={StaticResource StringFormatConverter}, ConverterParameter='后端版本: {0}'}" Opacity="0.7"/>
                     <TextBlock Text="iFlyCompass 的 Windows 桌面管理工具" Opacity="0.5" FontSize="13"/>
                 </StackPanel>
             </Border>
@@ -22,7 +25,7 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="检查更新" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="后端更新" FontSize="16" FontWeight="SemiBold"/>
 
                     <StackPanel Spacing="8">
                         <HyperlinkButton Content="GitHub 项目地址"
@@ -35,7 +38,6 @@
                         <ProgressRing IsActive="{Binding IsChecking}" Width="20" Height="20" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- 后端更新提示 -->
                     <InfoBar IsOpen="{Binding UpdateAvailable}" Severity="Informational"
                              Title="发现后端新版本" Message="{Binding LatestVersion, Converter={StaticResource StringFormatConverter}, ConverterParameter='最新版本: {0}'}"
                              IsClosable="False"/>

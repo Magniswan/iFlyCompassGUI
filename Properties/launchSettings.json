@@ -1,5 +1,8 @@
 {
   "profiles": {
+    "iFlyCompassGUI (Packaged)": {
+      "commandName": "MsixPackage"
+    },
     "iFlyCompassGUI (Unpackaged)": {
       "commandName": "Project"
     }

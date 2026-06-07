@@ -143,6 +143,9 @@
                     <StackPanel Spacing="4" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding StatusMessage}" HorizontalAlignment="Center" Opacity="0.7"
                                    FontSize="13" TextWrapping="Wrap" MaxWidth="560"/>
+                        <TextBlock Text="{Binding CurrentDepName}" HorizontalAlignment="Center" Opacity="0.5"
+                                   FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="400"
+                                   Visibility="{Binding CurrentStep, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=4}"/>
                         <TextBlock Text="{Binding DepProgress}" HorizontalAlignment="Center" Opacity="0.6"
                                    FontSize="12"
                                    Visibility="{Binding CurrentStep, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=4}"/>
@@ -153,6 +156,13 @@
 
             <!-- 操作按钮区域 -->
             <StackPanel Spacing="12" HorizontalAlignment="Center">
+                <StackPanel Spacing="8"
+                            Visibility="{Binding IsResuming, Converter={StaticResource BoolToVisibilityConverter}}"
+                            HorizontalAlignment="Center">
+                    <ProgressRing IsActive="{Binding IsResuming}" HorizontalAlignment="Center" Width="28" Height="28"/>
+                    <TextBlock Text="正在恢复安装..." HorizontalAlignment="Center" Opacity="0.7" FontSize="13"/>
+                </StackPanel>
+
                 <Button Content="进入主页" Command="{Binding NavigateHomeCommand}"
                         Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Center" Padding="48,12"
                         Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}}"/>

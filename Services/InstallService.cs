@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Models;
 
 namespace iFlyCompassGUI.Services;
@@ -9,7 +10,7 @@ public class InstallService : IInstallService
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseDir;
-    
+
     public event EventHandler<InstallProgress>? ProgressChanged;
     public bool IsInstalled => File.Exists(Path.Combine(_baseDir, "iFlyCompass", "app.py"));
 
@@ -87,7 +88,7 @@ public class InstallService : IInstallService
     public InstallService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _baseDir = AppContext.BaseDirectory;
+        _baseDir = PathHelper.DataDirectory;
     }
     
     public async Task<InstallResult> InstallAsync(ReleaseInfo release)
@@ -107,33 +108,43 @@ public class InstallService : IInstallService
         if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
         ZipFile.ExtractToDirectory(tempFile, extractDir);
 
+        var sourceDir = extractDir;
         var nestedDir = Directory.GetDirectories(extractDir).FirstOrDefault();
-        if (nestedDir != null)
+        if (nestedDir != null && Directory.GetFiles(extractDir).Length == 0)
         {
-            if (Directory.Exists(targetDir))
+            // GitHub zipballs have a single nested directory at the root
+            sourceDir = nestedDir;
+        }
+
+        if (Directory.Exists(targetDir))
+        {
+            foreach (var file in Directory.GetFiles(sourceDir))
             {
-                foreach (var file in Directory.GetFiles(nestedDir))
-                {
-                    var destFile = Path.Combine(targetDir, Path.GetFileName(file));
-                    File.Copy(file, destFile, true);
-                }
-                foreach (var dir in Directory.GetDirectories(nestedDir))
-                {
-                    var dirName = Path.GetFileName(dir);
-                    if (dirName is "instance" or "temp") continue;
-                    var destDir = Path.Combine(targetDir, dirName);
-                    if (Directory.Exists(destDir)) Directory.Delete(destDir, true);
-                    Directory.Move(dir, destDir);
-                }
+                var destFile = Path.Combine(targetDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
             }
-            else
+            foreach (var dir in Directory.GetDirectories(sourceDir))
             {
-                Directory.Move(nestedDir, targetDir);
+                var dirName = Path.GetFileName(dir);
+                if (dirName is "instance" or "temp") continue;
+                var destDir = Path.Combine(targetDir, dirName);
+                if (Directory.Exists(destDir)) Directory.Delete(destDir, true);
+                Directory.Move(dir, destDir);
             }
+        }
+        else
+        {
+            Directory.Move(sourceDir, targetDir);
         }
 
         File.Delete(tempFile);
         if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+
+        // Verify installation
+        if (!File.Exists(Path.Combine(targetDir, "app.py")))
+        {
+            return new InstallResult { Success = false, Message = "安装验证失败：app.py 不存在，请重试" };
+        }
 
         ReportProgress(3, "安装 Python 环境", 0, 0, 0, 0);
         await SetupPythonEnvironmentAsync(pythonDir);
@@ -243,22 +254,31 @@ public class InstallService : IInstallService
         progressCallback(downloaded, totalBytes, 0);
     }
     
+    private string _currentDepName = string.Empty;
+
     private async Task InstallDependenciesAsync(string targetDir, int totalDeps)
     {
         var pythonPath = Path.Combine(_baseDir, "python", "python.exe");
         var reqFile = Path.Combine(targetDir, "requirements.txt");
         if (!File.Exists(reqFile)) return;
 
+        // 关键修复：嵌入版 Python 默认没有 setuptools，先确保构建工具已安装
+        await EnsureBuildToolsAsync(pythonPath);
+
         var installed = 0;
 
+        // First attempt: install all deps together
+        // --prefer-binary: prefer wheels (avoids Rust build for cryptography etc.),
+        // but fall back to source for packages without wheels
         var psi = new ProcessStartInfo
         {
             FileName = pythonPath,
-            Arguments = $"-m pip install -r \"{reqFile}\"",
+            Arguments = $"-m pip install -r \"{reqFile}\" --no-warn-script-location --prefer-binary",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            WorkingDirectory = targetDir
         };
 
         using var process = new Process { StartInfo = psi };
@@ -269,19 +289,32 @@ public class InstallService : IInstallService
             while (!process.StandardOutput.EndOfStream)
             {
                 var line = await process.StandardOutput.ReadLineAsync();
-                if (line?.Contains("Successfully installed") == true)
+                if (line == null) continue;
+
+                // "Collecting package_name" indicates pip is processing this package
+                var collectingMatch = Regex.Match(line, @"^Collecting\s+(\S+)");
+                if (collectingMatch.Success)
+                {
+                    _currentDepName = collectingMatch.Groups[1].Value;
+                    ReportProgress(4, "安装依赖", 0, 0, installed, totalDeps);
+                }
+                else if (line.Contains("Successfully installed"))
                 {
                     var match = Regex.Match(line, @"Successfully installed\s+(.+)");
                     if (match.Success)
                     {
                         var packages = match.Groups[1].Value.Split().Length;
                         installed += packages;
+                        _currentDepName = string.Empty;
                         ReportProgress(4, "安装依赖", 0, 0, installed, totalDeps);
                     }
                 }
-                else if (line?.Contains("Requirement already satisfied") == true)
+                else if (line.Contains("Requirement already satisfied"))
                 {
                     installed++;
+                    var reqMatch = Regex.Match(line, @"Requirement already satisfied:\s+(\S+)");
+                    if (reqMatch.Success)
+                        _currentDepName = reqMatch.Groups[1].Value;
                     ReportProgress(4, "安装依赖", 0, 0, Math.Min(installed, totalDeps), totalDeps);
                 }
             }
@@ -297,13 +330,89 @@ public class InstallService : IInstallService
 
         await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
 
-        // Ensure final progress shows completion
-        if (installed < totalDeps)
+        // If pip failed, retry each package individually to isolate failures
+        if (process.ExitCode != 0)
         {
-            ReportProgress(4, "安装依赖", 0, 0, totalDeps, totalDeps);
+            var lines = await File.ReadAllLinesAsync(reqFile);
+            var packages = lines
+                .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("#"))
+                .ToList();
+
+            for (var i = 0; i < packages.Count; i++)
+            {
+                var pkg = packages[i].Trim();
+                if (string.IsNullOrEmpty(pkg)) continue;
+
+                _currentDepName = pkg;
+                ReportProgress(4, "安装依赖", 0, 0, i, totalDeps);
+
+                var retryPsi = new ProcessStartInfo
+                {
+                    FileName = pythonPath,
+                    Arguments = $"-m pip install \"{pkg}\" --no-warn-script-location --prefer-binary",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = targetDir
+                };
+
+                using var retryProcess = new Process { StartInfo = retryPsi };
+                retryProcess.Start();
+
+                // Must drain stdout/stderr to prevent deadlock when buffers fill up
+                var retryOutTask = Task.Run(async () =>
+                {
+                    while (!retryProcess.StandardOutput.EndOfStream)
+                        await retryProcess.StandardOutput.ReadLineAsync();
+                });
+                var retryErrTask = Task.Run(async () =>
+                {
+                    while (!retryProcess.StandardError.EndOfStream)
+                        await retryProcess.StandardError.ReadLineAsync();
+                });
+
+                await Task.WhenAll(retryOutTask, retryErrTask, retryProcess.WaitForExitAsync());
+            }
         }
+
+        _currentDepName = string.Empty;
+        ReportProgress(4, "安装依赖", 0, 0, totalDeps, totalDeps);
     }
-    
+
+    /// <summary>
+    /// 嵌入版 Python 默认不含 setuptools/wheel，但部分包（如 bilibili-api-python）需要从源码构建，必须先安装构建工具。
+    /// setuptools-scm 是 qrcode_terminal 等仅有 sdist 分发的包的必要构建依赖。
+    /// </summary>
+    private async Task EnsureBuildToolsAsync(string pythonPath)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = pythonPath,
+            Arguments = "-m pip install setuptools wheel setuptools-scm --no-warn-script-location",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+        process.Start();
+
+        var outTask = Task.Run(async () =>
+        {
+            while (!process.StandardOutput.EndOfStream)
+                await process.StandardOutput.ReadLineAsync();
+        });
+        var errTask = Task.Run(async () =>
+        {
+            while (!process.StandardError.EndOfStream)
+                await process.StandardError.ReadLineAsync();
+        });
+
+        await Task.WhenAll(outTask, errTask, process.WaitForExitAsync());
+    }
+
     private int GetDepCount(string targetDir)
     {
         var reqFile = Path.Combine(targetDir, "requirements.txt");
@@ -340,12 +449,15 @@ public class InstallService : IInstallService
             TotalDeps = totalDeps,
             DownloadSpeedBytesPerSec = speed,
             DownloadSizeText = sizeText,
+            CurrentDepName = _currentDepName,
             StatusMessage = step switch
             {
                 1 => total > 0 ? $"正在下载 iFlyCompass... {FormatSize(downloaded)} / {FormatSize(total)}" : "正在下载 iFlyCompass...",
                 2 => "正在解压 iFlyCompass...",
                 3 => speed > 0 ? $"正在下载 Python... {FormatSize(downloaded)} / {FormatSize(total)}" : "正在安装 Python 环境...",
-                4 => $"正在安装依赖... {installed}/{totalDeps}",
+                4 => string.IsNullOrEmpty(_currentDepName)
+                    ? $"正在安装依赖... {installed}/{totalDeps}"
+                    : $"正在安装依赖... {installed}/{totalDeps} ({_currentDepName})",
                 5 => "安装完成！",
                 _ => ""
             }

@@ -61,3 +61,19 @@ AGENTS.md
 *.temp
 
 iFlyCompassGUI.md
+
+## Certificate and signing (NEVER commit these)
+cert/
+
+## Scripts (local packaging/cert tools, not needed in repo)
+scripts/
+
+## MSIX packages
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+AppPackages/
+
+## Browser / web data
+.gemini-web-data/

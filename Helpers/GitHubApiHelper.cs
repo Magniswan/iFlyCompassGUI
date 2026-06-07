@@ -7,7 +7,6 @@ public static class GitHubApiHelper
 {
     private static string GetApiBase(string repoUrl)
     {
-        // Convert https://github.com/owner/repo to https://api.github.com/repos/owner/repo
         if (repoUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase))
         {
             var path = repoUrl["https://github.com/".Length..].TrimEnd('/');
@@ -44,7 +43,13 @@ public static class GitHubApiHelper
             Body = json.body,
             ZipballUrl = json.zipball_url,
             TarballUrl = json.tarball_url,
-            PublishedAt = json.published_at
+            PublishedAt = json.published_at,
+            Assets = json.assets?.Select(a => new ReleaseAsset
+            {
+                Name = a.name,
+                DownloadUrl = a.browser_download_url,
+                Size = a.size
+            }).ToList() ?? []
         };
     }
 
@@ -69,7 +74,6 @@ public static class GitHubApiHelper
         var json = await response.Content.ReadFromJsonAsync<GitHubReleaseDetailResponse>();
         if (json?.assets == null) return null;
 
-        // If assetName starts with ".", treat it as an extension and find by suffix match
         if (assetName.StartsWith("."))
         {
             var asset = json.assets.FirstOrDefault(a => a.name.EndsWith(assetName, StringComparison.OrdinalIgnoreCase));
@@ -88,6 +92,7 @@ public static class GitHubApiHelper
         public string zipball_url { get; set; } = string.Empty;
         public string tarball_url { get; set; } = string.Empty;
         public DateTime published_at { get; set; }
+        public List<GitHubAsset>? assets { get; set; }
     }
 
     private class GitHubReleaseDetailResponse
@@ -102,5 +107,6 @@ public static class GitHubApiHelper
     {
         public string name { get; set; } = string.Empty;
         public string browser_download_url { get; set; } = string.Empty;
+        public long size { get; set; }
     }
 }

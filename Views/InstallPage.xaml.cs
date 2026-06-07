@@ -24,6 +24,11 @@ public sealed partial class InstallPage : Page
             {
                 vm.StartInstallCommand.Execute(release);
             }
+            else
+            {
+                // No release info — this is a resume after interrupted install
+                _ = vm.ResumeInstallAsync();
+            }
         }
     }
     

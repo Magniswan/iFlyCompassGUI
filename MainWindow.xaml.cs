@@ -38,7 +38,15 @@ public sealed partial class MainWindow : Window
 
             if (!_viewModel.IsInstalled)
             {
-                WelcomeFrame.Navigate(typeof(WelcomePage));
+                if (_viewModel.IsPartiallyInstalled)
+                {
+                    // Installation was interrupted — go directly to install page
+                    WelcomeFrame.Navigate(typeof(InstallPage));
+                }
+                else
+                {
+                    WelcomeFrame.Navigate(typeof(WelcomePage));
+                }
             }
             else
             {
@@ -80,15 +88,37 @@ public sealed partial class MainWindow : Window
     {
         ContentFrame.Navigate(typeof(HomePage));
         _viewModel.IsInstalled = true;
+        _configService.Settings.IsInstalled = true;
+        _ = _configService.SaveAsync();
     }
 
     public void NavigateToWelcome()
     {
         WelcomeFrame.Navigate(typeof(WelcomePage));
         _viewModel.IsInstalled = false;
+        _configService.Settings.IsInstalled = false;
+        _ = _configService.SaveAsync();
+    }
+
+    public void ShowUpdateBadge()
+    {
+        _dispatcherHelper.RunOnUIThread(() =>
+        {
+            SettingsUpdateBadge.Visibility = Visibility.Visible;
+        });
+    }
+
+    public void HideUpdateBadge()
+    {
+        SettingsUpdateBadge.Visibility = Visibility.Collapsed;
     }
     
     private void TitleBar_PaneToggleRequested(TitleBar sender, object args)
+    {
+        NavView.IsPaneOpen = !NavView.IsPaneOpen;
+    }
+
+    private void PaneToggleButton_Click(object sender, RoutedEventArgs e)
     {
         NavView.IsPaneOpen = !NavView.IsPaneOpen;
     }

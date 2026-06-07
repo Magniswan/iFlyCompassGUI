@@ -10,9 +10,13 @@ public partial class AboutViewModel : ObservableObject
     private readonly IUpdateService _updateService;
     private readonly IConfigService _configService;
     private readonly IDialogService _dialogService;
+    private readonly IAppUpdateService _appUpdateService;
 
     [ObservableProperty]
     private string _currentVersion = "1.0.0";
+
+    [ObservableProperty]
+    private string _currentAppVersion = string.Empty;
 
     [ObservableProperty]
     private string _latestVersion = "";
@@ -40,11 +44,13 @@ public partial class AboutViewModel : ObservableObject
 
     private ReleaseInfo? _latestRelease;
 
-    public AboutViewModel(IUpdateService updateService, IConfigService configService, IDialogService dialogService)
+    public AboutViewModel(IUpdateService updateService, IConfigService configService, IDialogService dialogService, IAppUpdateService appUpdateService)
     {
         _updateService = updateService;
         _configService = configService;
         _dialogService = dialogService;
+        _appUpdateService = appUpdateService;
+        CurrentAppVersion = _appUpdateService.GetCurrentVersion();
     }
     
     [RelayCommand]
@@ -53,15 +59,12 @@ public partial class AboutViewModel : ObservableObject
         IsChecking = true;
         try
         {
-            // 检查后端更新
             _latestRelease = await _updateService.CheckForUpdateAsync(_configService.Settings.GitHubRepoUrl);
             if (_latestRelease != null)
             {
                 LatestVersion = _latestRelease.TagName;
                 UpdateAvailable = LatestVersion != CurrentVersion;
             }
-
-
         }
         catch (Exception ex)
         {

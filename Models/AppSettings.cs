@@ -11,4 +11,5 @@ public class AppSettings
     public int WindowY { get; set; } = 100;
     public string InstalledVersion { get; set; } = string.Empty;
     public string GitHubRepoUrl { get; set; } = "https://github.com/MoyuZJ912/iFlyCompass";
+    public bool IsInstalled { get; set; }
 }

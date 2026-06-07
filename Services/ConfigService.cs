@@ -1,4 +1,5 @@
 using System.Text.Json;
+using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Models;
 
 namespace iFlyCompassGUI.Services;
@@ -7,10 +8,10 @@ public class ConfigService : IConfigService
 {
     private readonly string _configPath;
     private AppSettings _settings = new();
-    
+
     public ConfigService()
     {
-        var appDir = AppContext.BaseDirectory;
+        var appDir = PathHelper.DataDirectory;
         _configPath = Path.Combine(appDir, "config", "settings.json");
         Directory.CreateDirectory(Path.GetDirectoryName(_configPath)!);
     }

@@ -11,4 +11,5 @@ public class InstallProgress
     public string StatusMessage { get; set; } = string.Empty;
     public double DownloadSpeedBytesPerSec { get; set; }
     public string DownloadSizeText { get; set; } = string.Empty;
+    public string CurrentDepName { get; set; } = string.Empty;
 }

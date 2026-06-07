@@ -25,6 +25,7 @@
             <local:StepToFontWeightConverter x:Key="StepToFontWeightConverter"/>
             <local:BoolToStartStopConverter x:Key="BoolToStartStopConverter"/>
             <local:LevelToColorConverter x:Key="LevelToColorConverter"/>
+            <local:LevelToTerminalColorConverter x:Key="LevelToTerminalColorConverter"/>
             <local:StringFormatConverter x:Key="StringFormatConverter"/>
             <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
             <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>

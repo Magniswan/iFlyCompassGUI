@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Models;
 using Microsoft.Data.Sqlite;
 
@@ -7,14 +8,14 @@ namespace iFlyCompassGUI.Services;
 public class UserDbService : IUserDbService
 {
     private readonly IInstallService _installService;
-    
+
     public bool IsDbAvailable => File.Exists(DbPath);
-    
-    public string DbPath 
-    { 
-        get 
+
+    public string DbPath
+    {
+        get
         {
-            var baseDir = AppContext.BaseDirectory;
+            var baseDir = PathHelper.DataDirectory;
             var iFlyCompassDir = Path.Combine(baseDir, "iFlyCompass");
             return Path.Combine(iFlyCompassDir, "instance", "users.db");
         }

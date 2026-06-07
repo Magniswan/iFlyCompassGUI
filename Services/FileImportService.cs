@@ -13,10 +13,10 @@ public class FileImportService : IFileImportService
     private readonly string _ffmpegPath;
     private readonly string _ffprobePath;
     private bool? _gpuAccelAvailable;
-    
+
     public FileImportService()
     {
-        _baseDir = AppContext.BaseDirectory;
+        _baseDir = PathHelper.DataDirectory;
         _novelsDir = Path.Combine(_baseDir, "iFlyCompass", "instance", "novels");
         _videosDir = Path.Combine(_baseDir, "iFlyCompass", "instance", "videos");
         _ffmpegPath = Path.Combine(_baseDir, "iFlyCompass", "tools", "ffmpeg", "ffmpeg.exe");

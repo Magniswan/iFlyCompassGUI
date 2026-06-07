@@ -9,23 +9,25 @@ namespace iFlyCompassGUI.ViewModels;
 public partial class InstallViewModel : ObservableObject
 {
     private readonly IInstallService _installService;
+    private readonly IConfigService _configService;
     private readonly DispatcherHelper _dispatcherHelper;
-    
+    private readonly HttpClient _httpClient;
+
     [ObservableProperty]
     private int _currentStep;
-    
+
     [ObservableProperty]
     private string _stepName = "准备安装";
-    
+
     [ObservableProperty]
     private double _downloadProgress;
-    
+
     [ObservableProperty]
     private string _depProgress = "";
-    
+
     [ObservableProperty]
     private string _statusMessage = "";
-    
+
     [ObservableProperty]
     private bool _isInstalling;
 
@@ -50,15 +52,55 @@ public partial class InstallViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDownloading;
 
+    [ObservableProperty]
+    private string _currentDepName = "";
+
+    [ObservableProperty]
+    private bool _isResuming;
+
     private ReleaseInfo? _lastRelease;
 
     public event EventHandler? RequestNavigateHome;
-    
-    public InstallViewModel(IInstallService installService, DispatcherHelper dispatcherHelper)
+
+    public InstallViewModel(IInstallService installService, IConfigService configService, DispatcherHelper dispatcherHelper, HttpClient httpClient)
     {
         _installService = installService;
+        _configService = configService;
         _dispatcherHelper = dispatcherHelper;
+        _httpClient = httpClient;
         _installService.ProgressChanged += OnProgressChanged;
+    }
+
+    /// <summary>
+    /// Resume installation after an interrupted install.
+    /// Fetches the latest release and starts the install automatically.
+    /// </summary>
+    public async Task ResumeInstallAsync()
+    {
+        IsResuming = true;
+        StatusMessage = "正在获取版本信息...";
+        try
+        {
+            var release = await GitHubApiHelper.GetLatestReleaseAsync(_httpClient, _configService.Settings.GitHubRepoUrl);
+            if (release != null)
+            {
+                await StartInstallAsync(release);
+            }
+            else
+            {
+                IsFailed = true;
+                StatusMessage = "无法获取版本信息，请检查网络连接后重试";
+            }
+        }
+        catch (Exception ex)
+        {
+            IsFailed = true;
+            StatusMessage = $"获取版本信息失败: {ex.Message}";
+        }
+        finally
+        {
+            IsResuming = false;
+        }
     }
     
     private void OnProgressChanged(object? sender, InstallProgress e)
@@ -104,8 +146,17 @@ public partial class InstallViewModel : ObservableObject
                 DepProgress = $"{e.InstalledDeps}/{e.TotalDeps}";
             }
 
+            CurrentDepName = e.CurrentDepName;
+
             StatusMessage = e.StatusMessage;
             if (e.Step == 5) IsCompleted = true;
+
+            // Only mark as fully installed when all steps complete
+            if (e.Step == 5 && !_configService.Settings.IsInstalled)
+            {
+                _configService.Settings.IsInstalled = true;
+                _ = _configService.SaveAsync();
+            }
         });
     }
 
@@ -171,6 +222,10 @@ public partial class InstallViewModel : ObservableObject
         {
             await StartInstallAsync(_lastRelease);
         }
+        else
+        {
+            await ResumeInstallAsync();
+        }
     }
 
     [RelayCommand]
@@ -179,6 +234,10 @@ public partial class InstallViewModel : ObservableObject
         if (_lastRelease != null)
         {
             await StartInstallAsync(_lastRelease);
+        }
+        else
+        {
+            await ResumeInstallAsync();
         }
     }
 

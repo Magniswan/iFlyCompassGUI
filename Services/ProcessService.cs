@@ -13,15 +13,15 @@ public class ProcessService : IProcessService, IDisposable
     private readonly string _baseDir;
     private readonly string _pythonDir;
     private readonly CancellationTokenSource _cts = new();
-    
+
     public bool IsRunning { get; private set; }
     public event EventHandler<bool>? RunningStateChanged;
     public event EventHandler<string>? LogOutputReceived;
-    
+
     public ProcessService(DispatcherHelper dispatcherHelper)
     {
         _dispatcherHelper = dispatcherHelper;
-        _baseDir = AppContext.BaseDirectory;
+        _baseDir = PathHelper.DataDirectory;
         _pythonDir = Path.Combine(_baseDir, "python");
         _pythonPath = Path.Combine(_pythonDir, "python.exe");
         _appPyPath = Path.Combine(_baseDir, "iFlyCompass", "app.py");
@@ -69,6 +69,13 @@ public class ProcessService : IProcessService, IDisposable
             WorkingDirectory = iFlyCompassDir
         };
         
+        // 备选修复：通过 PYTHONPATH 环境变量显式指定 site-packages 路径
+        var sitePackagesPath = Path.Combine(_pythonDir, "Lib", "site-packages");
+        if (Directory.Exists(sitePackagesPath))
+        {
+            psi.EnvironmentVariables["PYTHONPATH"] = sitePackagesPath;
+        }
+        
         try
         {
             _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -99,7 +106,8 @@ public class ProcessService : IProcessService, IDisposable
         
         var lines = File.ReadAllLines(pthFile).ToList();
         
-        var neededEntries = new HashSet<string> { relativePath, "import site" };
+        // 关键修复：确保包含 site-packages 路径，否则嵌入版 Python 无法找到 pip 安装的包
+        var neededEntries = new HashSet<string> { relativePath, "Lib/site-packages", "import site" };
         var existingEntries = new HashSet<string>(lines.Select(l => l.Trim()));
         
         var changed = false;

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using iFlyCompassGUI.Helpers;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -11,9 +12,7 @@ public partial class AIConfigViewModel : ObservableObject
     [ObservableProperty]
     private string _apiKey = "";
     
-    [ObservableProperty]
-    private string _selectedModel = "deepseek-v4-flash";
-    
+
     [ObservableProperty]
     private string _apiBaseUrl = "https://api.deepseek.com/v1/chat/completions";
     
@@ -32,8 +31,7 @@ public partial class AIConfigViewModel : ObservableObject
     [ObservableProperty]
     private string _systemPrompt = "你是一个有用的AI助手，请用中文回答用户的问题。";
     
-    public string[] AvailableModels { get; } = { "deepseek-v4-flash", "deepseek-v4-pro", "gpt-3.5-turbo", "gpt-4" };
-    
+
     public AIConfigViewModel()
     {
         LoadConfig();
@@ -41,9 +39,9 @@ public partial class AIConfigViewModel : ObservableObject
     
     private void LoadConfig()
     {
-        var configPath = Path.Combine(AppContext.BaseDirectory, "iFlyCompass", "instance", "config.yml");
+        var configPath = Path.Combine(PathHelper.DataDirectory, "iFlyCompass", "instance", "config.yml");
         if (!File.Exists(configPath)) return;
-        
+
         try
         {
             var lines = File.ReadAllLines(configPath);
@@ -84,9 +82,7 @@ public partial class AIConfigViewModel : ObservableObject
                     case "api_url":
                         ApiBaseUrl = value;
                         break;
-                    case "model":
-                        SelectedModel = value;
-                        break;
+
                     case "max_tokens":
                         if (int.TryParse(value, out var mt)) MaxTokens = mt;
                         break;
@@ -107,7 +103,7 @@ public partial class AIConfigViewModel : ObservableObject
     [RelayCommand]
     private void SaveConfig()
     {
-        var configPath = Path.Combine(AppContext.BaseDirectory, "iFlyCompass", "instance", "config.yml");
+        var configPath = Path.Combine(PathHelper.DataDirectory, "iFlyCompass", "instance", "config.yml");
         var instanceDir = Path.GetDirectoryName(configPath)!;
         Directory.CreateDirectory(instanceDir);
         
@@ -148,7 +144,6 @@ public partial class AIConfigViewModel : ObservableObject
                 "ai:",
                 $"  api_key: {ApiKey}",
                 $"  api_url: {ApiBaseUrl}",
-                $"  model: {SelectedModel}",
                 $"  max_tokens: {MaxTokens}",
                 $"  temperature: {Temperature}",
                 $"  system_prompt: {SystemPrompt}"

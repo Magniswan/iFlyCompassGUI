@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Services;
 using System.Collections.ObjectModel;
 
@@ -21,7 +22,7 @@ public partial class NovelManagerViewModel : ObservableObject
     {
         _fileImportService = fileImportService;
         _dialogService = dialogService;
-        _novelsDir = Path.Combine(AppContext.BaseDirectory, "iFlyCompass", "instance", "novels");
+        _novelsDir = Path.Combine(PathHelper.DataDirectory, "iFlyCompass", "instance", "novels");
         LoadNovels();
     }
     

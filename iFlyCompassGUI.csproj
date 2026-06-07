@@ -5,13 +5,22 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>iFlyCompassGUI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <UseWinUI>true</UseWinUI>
-    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>x86;x64;arm64</Platforms>
-    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <Platform Condition=" '$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' ">x64</Platform>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition=" '$(RuntimeIdentifier)' == '' ">win-$(Platform)</RuntimeIdentifier>
+    <Version>1.0.0</Version>
+    <AppxPackage>true</AppxPackage>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <PackageCertificateThumbprint>4FA1EB1BCB5DF70F5584FB968F65B85D683BAA98</PackageCertificateThumbprint>
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <DefaultLanguage>zh-cn</DefaultLanguage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,5 +31,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
+
+  <!-- Import certificate password from local file (gitignored) -->
+  <Import Project="cert\cert-password.props" Condition="Exists('cert\cert-password.props')" />
 
 </Project>

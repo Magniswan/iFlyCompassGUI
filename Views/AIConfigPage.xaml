@@ -24,10 +24,7 @@
                         <TextBox Text="{Binding ApiBaseUrl, Mode=TwoWay}" Width="400" PlaceholderText="https://api.deepseek.com/v1/chat/completions"/>
                     </StackPanel>
                     
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="模型" FontWeight="SemiBold"/>
-                        <ComboBox ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}" Width="400"/>
-                    </StackPanel>
+
                 </StackPanel>
             </Border>
             

@@ -32,27 +32,29 @@
             </StackPanel>
         </Grid>
         
-        <Border Grid.Row="2" Background="{StaticResource CardAcrylicBrush}" 
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="8">
-            <ListView x:Name="LogListView" ItemsSource="{Binding LogEntries}" 
-                      SelectionMode="None">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:LogEntry">
-                        <Grid Padding="2,4" ColumnDefinitions="Auto,Auto,*">
-                            <TextBlock Grid.Column="0" Text="{Binding Timestamp, Converter={StaticResource StringFormatConverter}, ConverterParameter='{}{0:HH:mm:ss}'}" 
-                                       FontFamily="Consolas" Opacity="0.5" Width="60" VerticalAlignment="Center" FontSize="12"/>
-                            <Border Grid.Column="1" Background="{Binding Level, Converter={StaticResource LevelToColorConverter}}" 
-                                    CornerRadius="4" Padding="6,2" Margin="4,0">
-                                <TextBlock Text="{Binding Level}" FontSize="10" FontWeight="Bold" 
-                                           Foreground="White" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" 
-                                       FontFamily="Consolas" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+        <Border Grid.Row="2" Background="#FF0C0C0C" 
+                BorderBrush="#FF333333" BorderThickness="1"
+                CornerRadius="8" Padding="0">
+            <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="12,8,12,8">
+                <ItemsControl x:Name="LogItemsControl" ItemsSource="{Binding LogEntries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:LogEntry">
+                            <Grid Padding="0,1" ColumnDefinitions="Auto,*">
+                                <TextBlock Grid.Column="0" 
+                                           Text="{Binding Timestamp, Converter={StaticResource StringFormatConverter}, ConverterParameter='{}{0:HH:mm:ss} '}" 
+                                           FontFamily="Cascadia Code,Consolas" FontSize="12"
+                                           Foreground="#FF666666" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Message}" 
+                                           TextWrapping="Wrap" FontFamily="Cascadia Code,Consolas" FontSize="12"
+                                           Foreground="{Binding Level, Converter={StaticResource LevelToTerminalColorConverter}}"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </Border>
     </Grid>
 </Page>

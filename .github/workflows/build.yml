@@ -1,127 +1,225 @@
-name: build
+name: Build and Release
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version suffix for artifact names'
+        description: 'Version override (e.g. 1.2.3.0)'
         required: false
-        default: '1.0.0'
+        type: string
 
-permissions:
-  contents: read
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_XMLDOC_MODE: skip
 
 jobs:
   build:
-    name: build (${{ matrix.rid }})
     runs-on: windows-latest
-
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - rid: win-x64
-            platform: x64
-          - rid: win-x86
-            platform: x86
-          - rid: win-arm64
-            platform: arm64
-
-    env:
-      VERSION: ${{ github.event.inputs.version || '1.0.0' }}
-      DOTNET_NOLOGO: 'true'
-      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+        platform: [x86, x64, arm64]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/iFlyCompassGUI.csproj', '**/Directory.Build.props', '**/global.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Restore
-        run: dotnet restore iFlyCompassGUI.csproj
-
-      - name: Publish (${{ matrix.rid }}, self-contained)
-        run: >
-          dotnet publish iFlyCompassGUI.csproj
-          -c Release
-          -r ${{ matrix.rid }}
-          --self-contained true
-          -p:Platform=${{ matrix.platform }}
-          -p:WindowsPackageType=None
-          -p:PublishSingleFile=false
-          -p:PublishReadyToRun=false
-          -p:PublishDir=bin/publish/${{ matrix.rid }}
-          --nologo
-          --verbosity minimal
-
-      - name: Zip publish output
-        shell: pwsh
+      - name: Decode PFX certificate
         run: |
-          $publishDir = "bin/publish/${{ matrix.rid }}"
-          $zipName    = "iFlyCompassGUI-${{ env.VERSION }}-${{ matrix.rid }}.zip"
-          $artifactDir = "artifact"
-          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-          $zipPath = Join-Path $artifactDir $zipName
-          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          [System.IO.Compression.ZipFile]::CreateFromDirectory(
-              $publishDir,
-              $zipPath,
-              [System.IO.Compression.CompressionLevel]::Optimal,
-              $false
-          )
-          $size = (Get-Item $zipPath).Length
-          Write-Host ("::notice title=Artifact:: {0}  ({1:N1} MB)" -f $zipPath, ($size/1MB))
+          $pfxPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.pfx"
+          New-Item -ItemType Directory -Path (Split-Path $pfxPath) -Force | Out-Null
+          $bytes = [Convert]::FromBase64String("${{ secrets.PFX_BASE64 }}")
+          [IO.File]::WriteAllBytes($pfxPath, $bytes)
+          Write-Host "PFX written to: $pfxPath"
+
+      - name: Import certificate to store
+        run: |
+          $pfxPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.pfx"
+          $securePassword = ConvertTo-SecureString -String "${{ secrets.PFX_PASSWORD }}" -Force -AsPlainText
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\CurrentUser\My" -Password $securePassword | Out-Null
+
+          # Get thumbprint for signing
+          $cert = Get-ChildItem -Path "Cert:\CurrentUser\My" |
+            Where-Object { $_.Subject -eq "CN=Magniswan" } |
+            Sort-Object NotAfter -Descending |
+            Select-Object -First 1
+          Write-Host "Certificate thumbprint: $($cert.Thumbprint)"
+          echo "CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+
+          # Export .cer for user installation
+          $cerPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.cer"
+          Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+          Write-Host "Exported .cer to: $cerPath"
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="0.0.1"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build and package MSIX
+        run: |
+          dotnet msbuild iFlyCompassGUI.csproj `
+            -t:Build `
+            -p:Configuration=Release `
+            -p:Platform=${{ matrix.platform }} `
+            -p:AppxPackage=true `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:PackageCertificateThumbprint=$env:CERT_THUMBPRINT `
+            -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Prepare release assets
+        run: |
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE "release-output"
+          New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+
+          # Copy MSIX
+          $msix = Get-ChildItem -Path "AppPackages" -Filter "iFlyCompassGUI*.msix" -Recurse |
+            Select-Object -First 1
+          if ($msix) {
+            # Rename to include platform in filename
+            $newName = $msix.Name -replace '\.msix$', "_${{ matrix.platform }}.msix"
+            Copy-Item $msix.FullName -Destination (Join-Path $releaseDir $newName)
+            Write-Host "Copied MSIX: $newName"
+          }
+
+          # Copy .cer for user installation (only from x64 build to avoid duplicates)
+          if ("${{ matrix.platform }}" -eq "x64") {
+            $cerPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.cer"
+            if (Test-Path $cerPath) {
+              Copy-Item $cerPath -Destination $releaseDir
+              Write-Host "Copied CER: iFlyCompassGUI.cer"
+            }
+
+            # Copy install-cert.ps1
+            $installScript = Join-Path $env:GITHUB_WORKSPACE "scripts\install-cert.ps1"
+            if (Test-Path $installScript) {
+              Copy-Item $installScript -Destination $releaseDir
+              Write-Host "Copied install-cert.ps1"
+            }
+          }
+
+          # List output
+          Get-ChildItem $releaseDir | ForEach-Object {
+            $sizeMB = [math]::Round($_.Length / 1MB, 2)
+            Write-Host "  $($_.Name) ($sizeMB MB)"
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iFlyCompassGUI-${{ matrix.rid }}
-          path: artifact/*.zip
-          if-no-files-found: error
-          retention-days: 14
+          name: iFlyCompassGUI-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: release-output/
 
   release:
-    name: release
     needs: build
+    runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
+
     permissions:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: all-artifacts/
 
-      - name: List artifacts
+      - name: Merge artifacts into release-output
         run: |
-          Get-ChildItem -Recurse dist
-          Write-Host "---"
-          Get-ChildItem -Recurse dist -Filter *.zip
+          mkdir -p release-output
+          find all-artifacts/ -type f \( -name "*.msix" -o -name "*.cer" -o -name "*.ps1" \) -exec cp {} release-output/ \;
+          echo "Release assets:"
+          ls -lh release-output/
 
-      - name: Attach ZIPs to GitHub Release
+      - name: Generate release notes from commits
+        id: release_notes
+        shell: bash
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+
+          if [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            # This is the first tag, get all commits
+            PREV_TAG=""
+          fi
+
+          echo "Previous tag: ${PREV_TAG:-none (first release)}"
+
+          # Build release notes
+          {
+            echo "RELEASE_NOTES<<EOF"
+            echo "## What's Changed"
+            echo ""
+
+            if [ -n "$PREV_TAG" ]; then
+              echo "Changes since \`$PREV_TAG\`:"
+              echo ""
+              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges
+            else
+              echo "Initial release."
+              git log --pretty=format:"- %s (%h)" --no-merges -20
+            fi
+
+            echo ""
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Downloads"
+            echo ""
+            echo "| File | Architecture | Description |"
+            echo "|------|-------------|-------------|"
+            echo "| \`iFlyCompassGUI_*_x86.msix\` | x86 (32-bit) | For 32-bit Windows |"
+            echo "| \`iFlyCompassGUI_*_x64.msix\` | x64 (64-bit) | For 64-bit Windows |"
+            echo "| \`iFlyCompassGUI_*_arm64.msix\` | ARM64 | For ARM-based Windows devices |"
+            echo "| \`iFlyCompassGUI.cer\` | - | Certificate (install before MSIX) |"
+            echo ""
+            echo "### Installation"
+            echo ""
+            echo "1. Download and install \`iFlyCompassGUI.cer\` (or run \`install-cert.ps1\`) to trust the signing certificate"
+            echo "2. Download the MSIX package matching your CPU architecture"
+            echo "3. Double-click the MSIX file to install"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/**/*.zip
-          generate_release_notes: true
-          fail_on_unmatched_files: true
+          name: iFlyCompassGUI v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          files: release-output/*

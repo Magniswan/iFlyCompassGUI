@@ -11,6 +11,9 @@ public partial class App : Application
     public IServiceProvider Services { get; private set; } = null!;
     public Window? MainWindowInstance { get; private set; }
 
+    // Tracks whether a silent startup check found an update
+    public bool AppUpdateAvailable { get; set; }
+
     public App()
     {
         WinRT.ComWrappersSupport.InitializeComWrappers();
@@ -32,13 +35,17 @@ public partial class App : Application
         try
         {
             var appUpdateService = Services.GetRequiredService<IAppUpdateService>();
-            var dialogService = Services.GetRequiredService<IDialogService>();
             var update = await appUpdateService.CheckForUpdateAsync();
             
             if (update != null)
             {
-                await dialogService.ShowInfoAsync("发现新版本", 
-                    $"新版本 {update.TagName} 已发布！\n\n{update.Body}\n\n请前往设置页面下载更新。");
+                AppUpdateAvailable = true;
+
+                // Show badge on Settings nav item if MainWindow is ready
+                if (MainWindowInstance is MainWindow mw)
+                {
+                    mw.ShowUpdateBadge();
+                }
             }
         }
         catch
@@ -63,8 +70,7 @@ public partial class App : Application
             
             if (configService.Settings.AutoStartApp)
             {
-                var installService = Services.GetRequiredService<IInstallService>();
-                if (installService.IsInstalled)
+                if (configService.Settings.IsInstalled)
                 {
                     if (!processService.IsRunning)
                     {

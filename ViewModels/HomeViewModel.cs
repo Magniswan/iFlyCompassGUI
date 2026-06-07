@@ -43,7 +43,7 @@ public partial class HomeViewModel : ObservableObject
     
     private void DetectVersion()
     {
-        var baseDir = AppContext.BaseDirectory;
+        var baseDir = PathHelper.DataDirectory;
         var versionFile = Path.Combine(baseDir, "iFlyCompass", "VERSION");
         if (File.Exists(versionFile))
         {
@@ -100,15 +100,39 @@ public partial class HomeViewModel : ObservableObject
     {
         IsToggling = true;
         if (IsRunning)
+        {
             await _processService.StopAsync();
-        else
-            await _processService.StartAsync();
+            return;
+        }
+
+        var baseDir = PathHelper.DataDirectory;
+        var appPyPath = Path.Combine(baseDir, "iFlyCompass", "app.py");
+        if (!File.Exists(appPyPath))
+        {
+            VersionText = "未安装";
+            StatusText = "iFlyCompass 未安装，请前往欢迎页完成安装";
+            IsToggling = false;
+            return;
+        }
+
+        await _processService.StartAsync();
     }
     
     [RelayCommand]
     private async Task RestartServiceAsync()
     {
         IsToggling = true;
+
+        var baseDir = PathHelper.DataDirectory;
+        var appPyPath = Path.Combine(baseDir, "iFlyCompass", "app.py");
+        if (!File.Exists(appPyPath))
+        {
+            VersionText = "未安装";
+            StatusText = "iFlyCompass 未安装，请前往欢迎页完成安装";
+            IsToggling = false;
+            return;
+        }
+
         await _processService.RestartAsync();
     }
     

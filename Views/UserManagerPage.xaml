@@ -51,6 +51,16 @@
                         <FontIcon Glyph="&#xE72C;"/>
                     </AppBarButton.Icon>
                 </AppBarButton>
+                <AppBarButton Label="导出数据库" Command="{Binding ExportDbCommand}">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xEDE1;"/>
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="导入数据库" Command="{Binding ImportDbCommand}">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE8E5;"/>
+                    </AppBarButton.Icon>
+                </AppBarButton>
             </CommandBar>
 
             <Grid Grid.Row="1" ColumnDefinitions="Auto,*,*,*,Auto,Auto,Auto" Padding="12,8" Background="{StaticResource CardAcrylicBrush}" Margin="0,4,0,0">

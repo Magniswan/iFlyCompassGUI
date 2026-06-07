@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Models;
 using iFlyCompassGUI.Services;
 using System.Collections.ObjectModel;
@@ -38,7 +39,7 @@ public partial class VideoManagerViewModel : ObservableObject
     {
         _fileImportService = fileImportService;
         _dialogService = dialogService;
-        _videosDir = Path.Combine(AppContext.BaseDirectory, "iFlyCompass", "instance", "videos");
+        _videosDir = Path.Combine(PathHelper.DataDirectory, "iFlyCompass", "instance", "videos");
         Directory.CreateDirectory(_videosDir);
         LoadVideos();
     }

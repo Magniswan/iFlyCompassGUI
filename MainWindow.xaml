@@ -13,12 +13,22 @@
         <TitleBar
             x:Name="titleBar"
             Title="iFlyCompass GUI"
-            IsPaneToggleButtonVisible="True"
+            IsPaneToggleButtonVisible="False"
             PaneToggleRequested="TitleBar_PaneToggleRequested"
             DoubleTapped="TitleBar_DoubleTapped">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="/Assets/WindowIcon.ico" />
             </TitleBar.IconSource>
+            <TitleBar.LeftHeader>
+                <Button x:Name="PaneToggleButton"
+                        Click="PaneToggleButton_Click"
+                        VerticalAlignment="Center"
+                        Padding="4"
+                        Background="Transparent"
+                        BorderThickness="0">
+                    <ImageIcon Source="/Assets/WindowIcon.ico" Width="16" Height="16"/>
+                </Button>
+            </TitleBar.LeftHeader>
         </TitleBar>
 
         <NavigationView x:Name="NavView"
@@ -74,6 +84,9 @@
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE713;"/>
                     </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge x:Name="SettingsUpdateBadge" Visibility="Collapsed" Value="1"/>
+                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 

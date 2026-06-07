@@ -90,6 +90,24 @@ public class DialogService : IDialogService
         return file?.Path;
     }
     
+    public async Task<string?> ShowSaveFilePickerAsync(string defaultFileName, string[] fileTypes)
+    {
+        var window = GetMainWindow();
+        if (window == null) return null;
+
+        var picker = new Windows.Storage.Pickers.FileSavePicker();
+        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
+        picker.SuggestedFileName = defaultFileName;
+
+        foreach (var ext in fileTypes)
+            picker.FileTypeChoices.Add(ext, new List<string> { ext });
+
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(window));
+
+        var file = await picker.PickSaveFileAsync();
+        return file?.Path;
+    }
+
     public async Task<string?> ShowFolderPickerAsync()
     {
         var window = GetMainWindow();

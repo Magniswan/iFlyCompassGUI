@@ -6,5 +6,6 @@ public interface IDialogService
     Task<bool> ShowConfirmAsync(string title, string message);
     Task<string?> ShowInputAsync(string title, string message, string defaultText = "");
     Task<string?> ShowOpenFilePickerAsync(string[] fileTypes);
+    Task<string?> ShowSaveFilePickerAsync(string defaultFileName, string[] fileTypes);
     Task<string?> ShowFolderPickerAsync();
 }
