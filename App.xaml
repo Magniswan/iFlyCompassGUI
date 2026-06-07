@@ -26,6 +26,8 @@
             <local:BoolToStartStopConverter x:Key="BoolToStartStopConverter"/>
             <local:LevelToColorConverter x:Key="LevelToColorConverter"/>
             <local:StringFormatConverter x:Key="StringFormatConverter"/>
+            <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+            <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -18,7 +18,12 @@
             
             <ProgressRing IsActive="{Binding IsLoading}" HorizontalAlignment="Center" Width="32" Height="32"/>
             
-            <TextBlock Text="{Binding StatusMessage}" HorizontalAlignment="Center" Opacity="0.7"/>
+            <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <TextBlock Text="{Binding StatusMessage}" HorizontalAlignment="Center" Opacity="0.7"/>
+                <Button Content="重试" Command="{Binding RetryCommand}" 
+                        HorizontalAlignment="Center"
+                        Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
             
             <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">

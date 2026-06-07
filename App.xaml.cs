@@ -24,6 +24,27 @@ public partial class App : Application
         MainWindowInstance.Activate();
         
         _ = AutoStartIfNeededAsync();
+        _ = CheckForAppUpdateAsync();
+    }
+    
+    private async Task CheckForAppUpdateAsync()
+    {
+        try
+        {
+            var appUpdateService = Services.GetRequiredService<IAppUpdateService>();
+            var dialogService = Services.GetRequiredService<IDialogService>();
+            var update = await appUpdateService.CheckForUpdateAsync();
+            
+            if (update != null)
+            {
+                await dialogService.ShowInfoAsync("发现新版本", 
+                    $"新版本 {update.TagName} 已发布！\n\n{update.Body}\n\n请前往设置页面下载更新。");
+            }
+        }
+        catch
+        {
+            // Silently fail on startup check
+        }
     }
     
     private async Task AutoStartIfNeededAsync()
@@ -75,6 +96,7 @@ public partial class App : Application
         services.AddSingleton<IInstallService, InstallService>();
         services.AddSingleton<IUserDbService, UserDbService>();
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IAppUpdateService, AppUpdateService>();
         services.AddSingleton<IFileImportService, FileImportService>();
         
         services.AddSingleton<LogViewModel>();

@@ -58,6 +58,35 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
+                    <TextBlock Text="应用更新" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock FontSize="12" Opacity="0.6">
+                        <Run Text="当前版本: "/><Run Text="{Binding CurrentAppVersion}"/>
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="检查更新" Command="{Binding CheckAppUpdateCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource BoolNegationConverter}}"/>
+                        <ProgressRing IsActive="{Binding IsCheckingUpdate}" Width="20" Height="20"
+                                      HorizontalAlignment="Left"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding AppUpdateStatus}" FontSize="13"
+                               Visibility="{Binding AppUpdateStatus, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    <ProgressBar Value="{Binding UpdateDownloadProgress}" Minimum="0" Maximum="100"
+                                 Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12"
+                                Visibility="{Binding AvailableUpdate, Converter={StaticResource NullToVisibilityConverter}}">
+                        <Button Content="下载并安装更新" Command="{Binding DownloadUpdateCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="{Binding IsDownloadingUpdate, Converter={StaticResource BoolNegationConverter}}"/>
+                        <ProgressRing IsActive="{Binding IsDownloadingUpdate}" Width="20" Height="20"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
                     <TextBlock Text="应用管理" FontSize="16" FontWeight="SemiBold"/>
                     <Button Content="卸载 iFlyCompass" Command="{Binding UninstallCommand}"
                             Style="{StaticResource DefaultButtonStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"

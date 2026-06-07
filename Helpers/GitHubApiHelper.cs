@@ -69,8 +69,15 @@ public static class GitHubApiHelper
         var json = await response.Content.ReadFromJsonAsync<GitHubReleaseDetailResponse>();
         if (json?.assets == null) return null;
 
-        var asset = json.assets.FirstOrDefault(a => a.name.Equals(assetName, StringComparison.OrdinalIgnoreCase));
-        return asset?.browser_download_url;
+        // If assetName starts with ".", treat it as an extension and find by suffix match
+        if (assetName.StartsWith("."))
+        {
+            var asset = json.assets.FirstOrDefault(a => a.name.EndsWith(assetName, StringComparison.OrdinalIgnoreCase));
+            return asset?.browser_download_url;
+        }
+
+        var exactAsset = json.assets.FirstOrDefault(a => a.name.Equals(assetName, StringComparison.OrdinalIgnoreCase));
+        return exactAsset?.browser_download_url;
     }
 
     private class GitHubReleaseResponse

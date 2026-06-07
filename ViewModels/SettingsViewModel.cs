@@ -11,6 +11,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IProcessService _processService;
     private readonly IInstallService _installService;
     private readonly IDialogService _dialogService;
+    private readonly IAppUpdateService _appUpdateService;
 
     [ObservableProperty]
     private bool _autoStartApp;
@@ -27,14 +28,33 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isUninstalling;
 
+    [ObservableProperty]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private bool _isDownloadingUpdate;
+
+    [ObservableProperty]
+    private string _appUpdateStatus = string.Empty;
+
+    [ObservableProperty]
+    private double _updateDownloadProgress;
+
+    [ObservableProperty]
+    private string _currentAppVersion = string.Empty;
+
+    [ObservableProperty]
+    private AppUpdateInfo? _availableUpdate;
+
     public event EventHandler? RequestNavigateWelcome;
 
-    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService)
+    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IAppUpdateService appUpdateService)
     {
         _configService = configService;
         _processService = processService;
         _installService = installService;
         _dialogService = dialogService;
+        _appUpdateService = appUpdateService;
         LoadSettings();
     }
 
@@ -44,6 +64,7 @@ public partial class SettingsViewModel : ObservableObject
         AutoStartOnWindowsBoot = _configService.Settings.AutoStartOnWindowsBoot;
         RememberWindowState = !string.IsNullOrEmpty(_configService.Settings.LastSelectedPage);
         GitHubRepoUrl = _configService.Settings.GitHubRepoUrl;
+        CurrentAppVersion = _appUpdateService.GetCurrentVersion();
     }
     
     partial void OnAutoStartAppChanged(bool value)
@@ -80,6 +101,68 @@ public partial class SettingsViewModel : ObservableObject
         _configService.Settings.GitHubRepoUrl = "https://github.com/MoyuZJ912/iFlyCompass";
         _ = _configService.SaveAsync();
         LoadSettings();
+    }
+
+    [RelayCommand]
+    private async Task CheckAppUpdateAsync()
+    {
+        if (IsCheckingUpdate) return;
+
+        IsCheckingUpdate = true;
+        AppUpdateStatus = "正在检查更新...";
+        AvailableUpdate = null;
+
+        try
+        {
+            var update = await _appUpdateService.CheckForUpdateAsync();
+            if (update != null)
+            {
+                AvailableUpdate = update;
+                AppUpdateStatus = $"发现新版本: {update.TagName}";
+            }
+            else
+            {
+                AppUpdateStatus = "当前已是最新版本";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppUpdateStatus = $"检查失败: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadUpdateAsync()
+    {
+        if (IsDownloadingUpdate || AvailableUpdate == null) return;
+
+        IsDownloadingUpdate = true;
+        UpdateDownloadProgress = 0;
+        AppUpdateStatus = "正在下载更新...";
+
+        try
+        {
+            var progress = new Progress<DownloadProgressInfo>(info =>
+            {
+                UpdateDownloadProgress = info.ProgressPercentage;
+                AppUpdateStatus = $"{info.Stage} {info.ProgressPercentage:F0}%";
+            });
+
+            await _appUpdateService.DownloadAndInstallAsync(AvailableUpdate, progress);
+            AppUpdateStatus = "更新已下载，正在启动安装程序...";
+        }
+        catch (Exception ex)
+        {
+            AppUpdateStatus = $"下载失败: {ex.Message}";
+        }
+        finally
+        {
+            IsDownloadingUpdate = false;
+        }
     }
 
     [RelayCommand]

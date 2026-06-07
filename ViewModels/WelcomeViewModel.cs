@@ -24,6 +24,9 @@ public partial class WelcomeViewModel : ObservableObject
     [ObservableProperty]
     private string _repoUrl = "";
 
+    [ObservableProperty]
+    private bool _hasError;
+
     public event EventHandler<ReleaseInfo>? RequestInstall;
 
     public WelcomeViewModel(IInstallService installService, IConfigService configService, HttpClient httpClient)
@@ -37,6 +40,7 @@ public partial class WelcomeViewModel : ObservableObject
     private async Task LoadReleaseInfoAsync()
     {
         IsLoading = true;
+        HasError = false;
         try
         {
             RepoUrl = _configService.Settings.GitHubRepoUrl;
@@ -46,13 +50,20 @@ public partial class WelcomeViewModel : ObservableObject
         catch
         {
             StatusMessage = "网络连接失败，请检查网络后重试";
+            HasError = true;
         }
         finally
         {
             IsLoading = false;
         }
     }
-    
+
+    [RelayCommand]
+    private async Task RetryAsync()
+    {
+        await LoadReleaseInfoAsync();
+    }
+
     [RelayCommand]
     private void StartInstall()
     {

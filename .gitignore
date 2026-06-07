@@ -38,9 +38,7 @@ $RECYCLE.BIN/
 .idea/
 *.sln.iml
 
-## Publish / AppX
-AppPackages/
-BundleArtifacts/
+## Publish
 PublishProfiles/*.pubxml.user
 
 ## Runtime bundled assets (auto-downloaded by the app)
@@ -61,8 +59,5 @@ AGENTS.md
 ## Local temp
 *.tmp
 *.temp
-
-## Certificate private keys
-*.pfx
 
 iFlyCompassGUI.md

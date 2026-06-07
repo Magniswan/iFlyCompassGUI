@@ -1,0 +1,127 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version suffix for artifact names'
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.rid }})
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            platform: x64
+          - rid: win-x86
+            platform: x86
+          - rid: win-arm64
+            platform: arm64
+
+    env:
+      VERSION: ${{ github.event.inputs.version || '1.0.0' }}
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/iFlyCompassGUI.csproj', '**/Directory.Build.props', '**/global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore iFlyCompassGUI.csproj
+
+      - name: Publish (${{ matrix.rid }}, self-contained)
+        run: >
+          dotnet publish iFlyCompassGUI.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:Platform=${{ matrix.platform }}
+          -p:WindowsPackageType=None
+          -p:PublishSingleFile=false
+          -p:PublishReadyToRun=false
+          -p:PublishDir=bin/publish/${{ matrix.rid }}
+          --nologo
+          --verbosity minimal
+
+      - name: Zip publish output
+        shell: pwsh
+        run: |
+          $publishDir = "bin/publish/${{ matrix.rid }}"
+          $zipName    = "iFlyCompassGUI-${{ env.VERSION }}-${{ matrix.rid }}.zip"
+          $artifactDir = "artifact"
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+          $zipPath = Join-Path $artifactDir $zipName
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+              $publishDir,
+              $zipPath,
+              [System.IO.Compression.CompressionLevel]::Optimal,
+              $false
+          )
+          $size = (Get-Item $zipPath).Length
+          Write-Host ("::notice title=Artifact:: {0}  ({1:N1} MB)" -f $zipPath, ($size/1MB))
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iFlyCompassGUI-${{ matrix.rid }}
+          path: artifact/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: List artifacts
+        run: |
+          Get-ChildItem -Recurse dist
+          Write-Host "---"
+          Get-ChildItem -Recurse dist -Filter *.zip
+
+      - name: Attach ZIPs to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
