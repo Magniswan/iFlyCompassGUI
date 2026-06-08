@@ -185,54 +185,6 @@ jobs:
           echo "Release assets:"
           ls -lh release-output/
 
-      - name: Generate release notes from commits
-        id: release_notes
-        shell: bash
-        run: |
-          CURRENT_TAG="v${{ steps.version.outputs.version }}"
-
-          # Get the previous tag (excluding the current one)
-          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${CURRENT_TAG}$" | tail -1)
-
-          echo "Current tag: $CURRENT_TAG"
-          echo "Previous tag: ${PREV_TAG:-none (first release)}"
-
-          # Build release notes
-          {
-            echo "RELEASE_NOTES<<EOF"
-            echo "## What's Changed"
-            echo ""
-
-            if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
-              echo "Changes since \`$PREV_TAG\`:"
-              echo ""
-              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges
-            else
-              echo "Initial release."
-              git log --pretty=format:"- %s (%h)" --no-merges -n 20
-            fi
-
-            echo ""
-            echo ""
-            echo "---"
-            echo ""
-            echo "### Downloads"
-            echo ""
-            echo "| File | Architecture | Description |"
-            echo "|------|-------------|-------------|"
-            echo "| \`iFlyCompassGUI_*_x86.msix\` | x86 (32-bit) | For 32-bit Windows |"
-            echo "| \`iFlyCompassGUI_*_x64.msix\` | x64 (64-bit) | For 64-bit Windows |"
-            echo "| \`iFlyCompassGUI_*_arm64.msix\` | ARM64 | For ARM-based Windows devices |"
-            echo "| \`iFlyCompassGUI.cer\` | - | Certificate (install before MSIX) |"
-            echo ""
-            echo "### Installation"
-            echo ""
-            echo "1. Download and install \`iFlyCompassGUI.cer\` (or run \`install-cert.ps1\`) to trust the signing certificate"
-            echo "2. Download the MSIX package matching your CPU architecture"
-            echo "3. Double-click the MSIX file to install"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -240,5 +192,5 @@ jobs:
           name: iFlyCompassGUI v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
-          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          generate_release_notes: true
           files: release-output/*
