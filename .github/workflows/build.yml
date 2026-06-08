@@ -192,7 +192,7 @@ jobs:
           CURRENT_TAG="v${{ steps.version.outputs.version }}"
 
           # Get the previous tag (excluding the current one)
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${CURRENT_TAG}$" | tail -1)
 
           echo "Current tag: $CURRENT_TAG"
           echo "Previous tag: ${PREV_TAG:-none (first release)}"
@@ -203,13 +203,13 @@ jobs:
             echo "## What's Changed"
             echo ""
 
-            if [ -n "$PREV_TAG" ]; then
+            if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
               echo "Changes since \`$PREV_TAG\`:"
               echo ""
               git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges
             else
               echo "Initial release."
-              git log --pretty=format:"- %s (%h)" --no-merges -20
+              git log --pretty=format:"- %s (%h)" --no-merges -n 20
             fi
 
             echo ""
