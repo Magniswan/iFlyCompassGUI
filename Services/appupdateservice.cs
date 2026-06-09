@@ -52,7 +52,7 @@ public class AppUpdateService : IAppUpdateService
         var arch = GetCurrentArchitecture();
 
         // Find the MSIX asset matching current architecture
-        // Release assets are named like: iFlyCompassGUI_1.0.0.0_x64.msix
+        // Release assets are named like: iFlyCompassGUI_1.0.0_x64.msix
         var msixAsset = release.Assets.FirstOrDefault(a =>
             a.Name.EndsWith($"_{arch}.msix", StringComparison.OrdinalIgnoreCase));
 

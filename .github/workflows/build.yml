@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version override (e.g. 1.2.3.0)'
+        description: 'Version override (e.g. 1.2.3)'
         required: false
         type: string
 
@@ -97,8 +97,9 @@ jobs:
           $msix = Get-ChildItem -Path "AppPackages" -Filter "iFlyCompassGUI*.msix" -Recurse |
             Select-Object -First 1
           if ($msix) {
-            # Rename to include platform in filename
-            $newName = $msix.Name -replace '\.msix$', "_${{ matrix.platform }}.msix"
+            # Rename to 3-part version format: iFlyCompassGUI_1.0.0_x64.msix
+            $version = "${{ steps.version.outputs.version }}"
+            $newName = $msix.Name -replace '_\d+\.\d+\.\d+\.\d+_', "_${version}_"
             Copy-Item $msix.FullName -Destination (Join-Path $releaseDir $newName)
             Write-Host "Copied MSIX: $newName"
           }

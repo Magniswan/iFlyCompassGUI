@@ -32,8 +32,8 @@
             </StackPanel>
         </Grid>
         
-        <Border Grid.Row="2" Background="#FF0C0C0C" 
-                BorderBrush="#FF333333" BorderThickness="1"
+        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefault}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="0">
             <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled"

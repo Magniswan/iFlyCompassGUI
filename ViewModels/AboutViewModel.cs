@@ -114,6 +114,10 @@ public partial class AboutViewModel : ObservableObject
             {
                 LatestBackendVersion = _latestBackendRelease.TagName;
                 BackendUpdateAvailable = LatestBackendVersion != CurrentBackendVersion;
+                if (!BackendUpdateAvailable)
+                {
+                    await _dialogService.ShowInfoAsync("检查更新", "后端已是最新版本。");
+                }
             }
         }
         catch (Exception ex)
@@ -195,6 +199,10 @@ public partial class AboutViewModel : ObservableObject
                 LatestAppVersion = _latestAppRelease.TagName;
                 AppUpdateAvailable = true;
                 AppUpdateChangelog = _latestAppRelease.Body;
+            }
+            else
+            {
+                await _dialogService.ShowInfoAsync("检查更新", "GUI 已是最新版本。");
             }
         }
         catch (Exception ex)
