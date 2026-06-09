@@ -84,9 +84,6 @@
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE713;"/>
                     </NavigationViewItem.Icon>
-                    <NavigationViewItem.InfoBadge>
-                        <InfoBadge x:Name="SettingsUpdateBadge" Visibility="Collapsed" Value="1"/>
-                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 

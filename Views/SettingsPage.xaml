@@ -8,30 +8,19 @@
         <StackPanel Padding="32" Spacing="24" MaxWidth="600" HorizontalAlignment="Left">
             <TextBlock Text="设置" FontSize="24" FontWeight="Bold"/>
             
-            <Border Background="{StaticResource CardAcrylicBrush}" 
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
                     <TextBlock Text="启动设置" FontSize="16" FontWeight="SemiBold"/>
-                    <ToggleSwitch Header="启动本程序时自动启动 app.py" 
+                    <ToggleSwitch Header="启动本程序时自动启动 app.py"
                                   IsOn="{Binding AutoStartApp, Mode=TwoWay}"
                                   OnContent="开" OffContent="关"/>
                 </StackPanel>
             </Border>
-            
-            <Border Background="{StaticResource CardAcrylicBrush}" 
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
-                    CornerRadius="8" Padding="24">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="系统设置" FontSize="16" FontWeight="SemiBold"/>
-                    <ToggleSwitch Header="开机自动启动本程序" 
-                                  IsOn="{Binding AutoStartOnWindowsBoot, Mode=TwoWay}"
-                                  OnContent="开" OffContent="关"/>
-                </StackPanel>
-            </Border>
-            
-            <Border Background="{StaticResource CardAcrylicBrush}" 
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
+
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
                     <TextBlock Text="窗口设置" FontSize="16" FontWeight="SemiBold"/>
@@ -51,66 +40,6 @@
                         <x:String>https://github.com/MoyuZJ912/iFlyCompass</x:String>
                         <x:String>https://github.com/Magniswan/iFlyCompass</x:String>
                     </ComboBox>
-                </StackPanel>
-            </Border>
-
-            <Border Background="{StaticResource CardAcrylicBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="24">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="应用更新" FontSize="16" FontWeight="SemiBold"/>
-                    <TextBlock FontSize="12" Opacity="0.6">
-                        <Run Text="当前版本: "/><Run Text="{Binding CurrentAppVersion}"/>
-                    </TextBlock>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Content="检查更新" Command="{Binding CheckAppUpdateCommand}"
-                                Style="{StaticResource AccentButtonStyle}"
-                                IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource BoolNegationConverter}}"/>
-                        <ProgressRing IsActive="{Binding IsCheckingUpdate}" Width="20" Height="20"
-                                      HorizontalAlignment="Left"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding AppUpdateStatus}" FontSize="13"
-                               Visibility="{Binding AppUpdateStatus, Converter={StaticResource StringToVisibilityConverter}}"/>
-
-                    <!-- Update details panel -->
-                    <StackPanel Spacing="8"
-                                Visibility="{Binding AvailableUpdate, Converter={StaticResource NullToVisibilityConverter}}">
-                        <Border Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                CornerRadius="6" Padding="12">
-                            <StackPanel Spacing="6">
-                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                    <TextBlock Text="{Binding UpdateArchText}" FontSize="12" Opacity="0.7"/>
-                                    <TextBlock Text="{Binding UpdateFileSizeText}" FontSize="12" Opacity="0.7"/>
-                                </StackPanel>
-                                <TextBlock Text="{Binding UpdatePublishDateText}" FontSize="12" Opacity="0.7"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Changelog -->
-                        <Expander Header="更新内容" HorizontalAlignment="Stretch"
-                                  Visibility="{Binding UpdateChangelog, Converter={StaticResource StringToVisibilityConverter}}">
-                            <ScrollViewer MaxHeight="200">
-                                <TextBlock Text="{Binding UpdateChangelog}" TextWrapping="Wrap"
-                                           FontSize="12" Opacity="0.8"/>
-                            </ScrollViewer>
-                        </Expander>
-
-                        <!-- Download progress -->
-                        <StackPanel Spacing="6" Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <ProgressBar Value="{Binding UpdateDownloadProgress}" Minimum="0" Maximum="100"/>
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <TextBlock Text="{Binding DownloadSizeText}" FontSize="12" Opacity="0.7"/>
-                                <TextBlock Text="{Binding DownloadSpeedText}" FontSize="12" Opacity="0.7"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="下载并安装更新" Command="{Binding DownloadUpdateCommand}"
-                                    Style="{StaticResource AccentButtonStyle}"
-                                    IsEnabled="{Binding IsDownloadingUpdate, Converter={StaticResource BoolNegationConverter}}"/>
-                            <ProgressRing IsActive="{Binding IsDownloadingUpdate}" Width="20" Height="20"/>
-                        </StackPanel>
-                    </StackPanel>
                 </StackPanel>
             </Border>
 

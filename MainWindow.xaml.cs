@@ -100,19 +100,6 @@ public sealed partial class MainWindow : Window
         _ = _configService.SaveAsync();
     }
 
-    public void ShowUpdateBadge()
-    {
-        _dispatcherHelper.RunOnUIThread(() =>
-        {
-            SettingsUpdateBadge.Visibility = Visibility.Visible;
-        });
-    }
-
-    public void HideUpdateBadge()
-    {
-        SettingsUpdateBadge.Visibility = Visibility.Collapsed;
-    }
-    
     private void TitleBar_PaneToggleRequested(TitleBar sender, object args)
     {
         NavView.IsPaneOpen = !NavView.IsPaneOpen;

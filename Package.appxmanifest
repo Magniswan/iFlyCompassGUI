@@ -43,12 +43,6 @@
         <uap:SplashScreen Image="Assets\Square44x44Logo.png" />
       </uap:VisualElements>
       <Extensions>
-        <desktop:Extension Category="windows.startupTask">
-          <desktop:StartupTask
-            TaskId="iFlyCompassGUIStartup"
-            Enabled="false"
-            DisplayName="iFlyCompass GUI" />
-        </desktop:Extension>
       </Extensions>
     </Application>
   </Applications>

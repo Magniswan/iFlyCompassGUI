@@ -11,8 +11,7 @@ public partial class App : Application
     public IServiceProvider Services { get; private set; } = null!;
     public Window? MainWindowInstance { get; private set; }
 
-    // Tracks whether a silent startup check found an update
-    public bool AppUpdateAvailable { get; set; }
+
 
     public App()
     {
@@ -25,35 +24,10 @@ public partial class App : Application
     {
         MainWindowInstance = new MainWindow();
         MainWindowInstance.Activate();
-        
-        _ = AutoStartIfNeededAsync();
-        _ = CheckForAppUpdateAsync();
-    }
-    
-    private async Task CheckForAppUpdateAsync()
-    {
-        try
-        {
-            var appUpdateService = Services.GetRequiredService<IAppUpdateService>();
-            var update = await appUpdateService.CheckForUpdateAsync();
-            
-            if (update != null)
-            {
-                AppUpdateAvailable = true;
 
-                // Show badge on Settings nav item if MainWindow is ready
-                if (MainWindowInstance is MainWindow mw)
-                {
-                    mw.ShowUpdateBadge();
-                }
-            }
-        }
-        catch
-        {
-            // Silently fail on startup check
-        }
+        _ = AutoStartIfNeededAsync();
     }
-    
+
     private async Task AutoStartIfNeededAsync()
     {
         try

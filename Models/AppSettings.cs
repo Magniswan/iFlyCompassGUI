@@ -3,7 +3,6 @@ namespace iFlyCompassGUI.Models;
 public class AppSettings
 {
     public bool AutoStartApp { get; set; }
-    public bool AutoStartOnWindowsBoot { get; set; }
     public string LastSelectedPage { get; set; } = string.Empty;
     public int WindowWidth { get; set; } = 1200;
     public int WindowHeight { get; set; } = 800;
