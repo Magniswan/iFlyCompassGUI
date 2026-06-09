@@ -143,12 +143,6 @@
                     <StackPanel Spacing="4" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding StatusMessage}" HorizontalAlignment="Center" Opacity="0.7"
                                    FontSize="13" TextWrapping="Wrap" MaxWidth="560"/>
-                        <TextBlock Text="{Binding CurrentDepName}" HorizontalAlignment="Center" Opacity="0.5"
-                                   FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="400"
-                                   Visibility="{Binding CurrentStep, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=4}"/>
-                        <TextBlock Text="{Binding DepProgress}" HorizontalAlignment="Center" Opacity="0.6"
-                                   FontSize="12"
-                                   Visibility="{Binding CurrentStep, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=4}"/>
                     </StackPanel>
 
                 </StackPanel>

@@ -197,7 +197,7 @@ public class InstallService : IInstallService
             {
                 ReportProgress(3, "安装 pip", downloaded, total, 0, 0, speed);
             });
-            
+
             var psi = new ProcessStartInfo
             {
                 FileName = Path.Combine(pythonDir, "python.exe"),
@@ -207,14 +207,17 @@ public class InstallService : IInstallService
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            
+
             using var process = Process.Start(psi);
             if (process != null)
             {
                 await process.WaitForExitAsync();
             }
         }
-        
+
+        // 关键修复：嵌入版 Python 默认不含 setuptools/wheel，必须先安装，否则后续依赖构建会失败
+        await EnsureBuildToolsAsync(Path.Combine(pythonDir, "python.exe"));
+
         ReportProgress(3, "安装 Python 环境", 0, 0, 1, 1);
     }
     
@@ -262,9 +265,6 @@ public class InstallService : IInstallService
         var reqFile = Path.Combine(targetDir, "requirements.txt");
         if (!File.Exists(reqFile)) return;
 
-        // 关键修复：嵌入版 Python 默认没有 setuptools，先确保构建工具已安装
-        await EnsureBuildToolsAsync(pythonPath);
-
         var installed = 0;
 
         // First attempt: install all deps together
@@ -296,7 +296,8 @@ public class InstallService : IInstallService
                 if (collectingMatch.Success)
                 {
                     _currentDepName = collectingMatch.Groups[1].Value;
-                    ReportProgress(4, "安装依赖", 0, 0, installed, totalDeps);
+                    installed++;
+                    ReportProgress(4, "安装依赖", 0, 0, Math.Min(installed, totalDeps), totalDeps);
                 }
                 else if (line.Contains("Successfully installed"))
                 {

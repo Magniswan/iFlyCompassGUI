@@ -125,6 +125,9 @@ public class UpdateService : IUpdateService
             var reqFile = Path.Combine(targetDir, "requirements.txt");
             if (File.Exists(pythonPath) && File.Exists(reqFile))
             {
+                // 嵌入版 Python 默认不含 setuptools/wheel/setuptools-scm，但部分包需要从源码构建，必须先安装构建工具
+                await EnsureBuildToolsAsync(pythonPath);
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = pythonPath,
@@ -215,6 +218,38 @@ public class UpdateService : IUpdateService
         }
     }
     
+    /// <summary>
+    /// 嵌入版 Python 默认不含 setuptools/wheel/setuptools-scm，但部分包需要从源码构建，必须先安装构建工具。
+    /// </summary>
+    private static async Task EnsureBuildToolsAsync(string pythonPath)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = pythonPath,
+            Arguments = "-m pip install setuptools wheel setuptools-scm --no-warn-script-location",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+        process.Start();
+
+        var outTask = Task.Run(async () =>
+        {
+            while (!process.StandardOutput.EndOfStream)
+                await process.StandardOutput.ReadLineAsync();
+        });
+        var errTask = Task.Run(async () =>
+        {
+            while (!process.StandardError.EndOfStream)
+                await process.StandardError.ReadLineAsync();
+        });
+
+        await Task.WhenAll(outTask, errTask, process.WaitForExitAsync());
+    }
+
     private static void CopyDirectory(string source, string dest, string[] excludeDirs)
     {
         Directory.CreateDirectory(dest);
