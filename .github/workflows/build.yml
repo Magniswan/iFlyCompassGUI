@@ -77,7 +77,7 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build and package MSIX
+      - name: Update manifest version
         run: |
           $version = "${{ steps.version.outputs.version }}"
           # MSIX version must be 4-part (e.g. 1.2.3.0)
@@ -85,7 +85,16 @@ jobs:
             $version = "$version.0"
           }
           Write-Host "MSIX version: $version"
+          echo "MSIX_VERSION=$version" >> $env:GITHUB_ENV
 
+          $manifestPath = Join-Path $env:GITHUB_WORKSPACE "Package.appxmanifest"
+          [xml]$manifest = Get-Content $manifestPath
+          $manifest.Package.Identity.Version = $version
+          $manifest.Save($manifestPath)
+          Write-Host "Updated Package.appxmanifest version to $version"
+
+      - name: Build and package MSIX
+        run: |
           dotnet msbuild iFlyCompassGUI.csproj `
             -t:Build `
             -p:Configuration=Release `
@@ -93,9 +102,9 @@ jobs:
             -p:AppxPackage=true `
             -p:GenerateAppxPackageOnBuild=true `
             -p:PackageCertificateThumbprint=$env:CERT_THUMBPRINT `
-            -p:Version=$version `
-            -p:ApplicationDisplayVersion=$version `
-            -p:PackageVersion=$version
+            -p:Version=$env:MSIX_VERSION `
+            -p:ApplicationDisplayVersion=$env:MSIX_VERSION `
+            -p:PackageVersion=$env:MSIX_VERSION
 
       - name: Prepare release assets
         run: |
