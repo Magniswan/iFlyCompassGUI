@@ -79,6 +79,13 @@ jobs:
 
       - name: Build and package MSIX
         run: |
+          $version = "${{ steps.version.outputs.version }}"
+          # MSIX version must be 4-part (e.g. 1.2.3.0)
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            $version = "$version.0"
+          }
+          Write-Host "MSIX version: $version"
+
           dotnet msbuild iFlyCompassGUI.csproj `
             -t:Build `
             -p:Configuration=Release `
@@ -86,7 +93,9 @@ jobs:
             -p:AppxPackage=true `
             -p:GenerateAppxPackageOnBuild=true `
             -p:PackageCertificateThumbprint=$env:CERT_THUMBPRINT `
-            -p:Version=${{ steps.version.outputs.version }}
+            -p:Version=$version `
+            -p:ApplicationDisplayVersion=$version `
+            -p:PackageVersion=$version
 
       - name: Prepare release assets
         run: |
