@@ -19,9 +19,6 @@ env:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        platform: [x86, x64, arm64]
 
     steps:
       - name: Checkout
@@ -97,8 +94,8 @@ jobs:
         run: |
           dotnet build iFlyCompassGUI.csproj `
             -c Release `
-            -r win-${{ matrix.platform }} `
-            -p:Platform=${{ matrix.platform }} `
+            -r win-x64 `
+            -p:Platform=x64 `
             -p:AppxPackage=true `
             -p:GenerateAppxPackageOnBuild=true `
             -p:PackageCertificateThumbprint=$env:CERT_THUMBPRINT `
@@ -122,20 +119,18 @@ jobs:
             Write-Host "Copied MSIX: $newName"
           }
 
-          # Copy .cer for user installation (only from x64 build to avoid duplicates)
-          if ("${{ matrix.platform }}" -eq "x64") {
-            $cerPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.cer"
-            if (Test-Path $cerPath) {
-              Copy-Item $cerPath -Destination $releaseDir
-              Write-Host "Copied CER: iFlyCompassGUI.cer"
-            }
+          # Copy .cer for user installation
+          $cerPath = Join-Path $env:GITHUB_WORKSPACE "cert\iFlyCompassGUI.cer"
+          if (Test-Path $cerPath) {
+            Copy-Item $cerPath -Destination $releaseDir
+            Write-Host "Copied CER: iFlyCompassGUI.cer"
+          }
 
-            # Copy install-cert.ps1
-            $installScript = Join-Path $env:GITHUB_WORKSPACE "scripts\install-cert.ps1"
-            if (Test-Path $installScript) {
-              Copy-Item $installScript -Destination $releaseDir
-              Write-Host "Copied install-cert.ps1"
-            }
+          # Copy install-cert.ps1
+          $installScript = Join-Path $env:GITHUB_WORKSPACE "scripts\install-cert.ps1"
+          if (Test-Path $installScript) {
+            Copy-Item $installScript -Destination $releaseDir
+            Write-Host "Copied install-cert.ps1"
           }
 
           # List output
@@ -147,7 +142,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iFlyCompassGUI-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          name: iFlyCompassGUI-${{ steps.version.outputs.version }}-x64
           path: release-output/
 
   build-installer:
