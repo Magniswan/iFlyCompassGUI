@@ -75,7 +75,7 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore iFlyCompassGUI.csproj
 
       - name: Update manifest version
         run: |
@@ -260,7 +260,7 @@ jobs:
           }
 
           # Build Bootstrapper
-          msbuild installer\Bootstrapper\Bootstrapper.csproj -p:Configuration=Release -verbosity:minimal
+          dotnet build installer\Bootstrapper\Bootstrapper.csproj -c Release
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Bootstrapper build failed"
             exit 1

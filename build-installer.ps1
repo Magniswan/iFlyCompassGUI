@@ -151,29 +151,7 @@ Write-Host "`n[5/6] 构建 Bootstrapper..." -ForegroundColor Yellow
 
 $bootstrapperProj = "$RootDir\installer\Bootstrapper\Bootstrapper.csproj"
 
-# 使用 msbuild 构建 .NET Framework 项目
-$msbuild = Get-Command "msbuild" -ErrorAction SilentlyContinue
-if (-not $msbuild) {
-    # 尝试从 VS 安装路径查找
-    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    if (Test-Path $vsWhere) {
-        $vsInstallPath = & $vsWhere -latest -property installationPath 2>$null
-        if ($vsInstallPath) {
-            $msbuildPath = Join-Path $vsInstallPath "MSBuild\Current\Bin\MSBuild.exe"
-            if (Test-Path $msbuildPath) {
-                $msbuild = Get-Command $msbuildPath
-            }
-        }
-    }
-}
-
-if ($msbuild) {
-    & $msbuild.Source $bootstrapperProj -p:Configuration=$Configuration -verbosity:minimal
-}
-else {
-    # 回退到 dotnet build（SDK-style 项目可能支持）
-    dotnet build $bootstrapperProj -c $Configuration
-}
+dotnet build $bootstrapperProj -c $Configuration
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Bootstrapper 构建失败"
