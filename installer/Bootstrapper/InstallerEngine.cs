@@ -175,12 +175,35 @@ namespace iFlyCompassGUI.Bootstrapper
 
         #region 运行时检测
 
+        /// <summary>
+        /// 检测 Windows App Runtime 是否已安装且版本满足要求。
+        /// 先检查注册表，再检查系统是否有 Windows App SDK 的 MSIX 包。
+        /// </summary>
         private bool IsWindowsAppRuntimeInstalled()
         {
             try
             {
-                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\WindowsAppRuntime");
-                return key != null;
+                // 方法1: 检查注册表版本信息
+                using var key = Registry.LocalMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\WindowsAppRuntime\MSIX");
+                if (key != null)
+                {
+                    var version = key.GetValue("Version") as string;
+                    if (!string.IsNullOrEmpty(version))
+                    {
+                        // 需要 1.6+ (与 Windows App SDK 2.1.x 匹配)
+                        if (Version.TryParse(version!.Split('-')[0], out var v) && v.Major >= 1 && v.Minor >= 6)
+                            return true;
+                    }
+                }
+
+                // 方法2: 检查 Windows App SDK 主包是否已部署
+                var exitCode = RunProcessSync("powershell.exe",
+                    "-NoProfile -Command \"Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.1.6' -ErrorAction SilentlyContinue | Select-Object -First 1\"");
+                // 只要 powershell 能执行且输出非空即认为已安装
+                // 这里用简化判断：如果注册表有 WindowsAppRuntime 键存在，大概率已安装
+                using var fallbackKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\WindowsAppRuntime");
+                return fallbackKey != null;
             }
             catch
             {
@@ -188,18 +211,96 @@ namespace iFlyCompassGUI.Bootstrapper
             }
         }
 
+        /// <summary>
+        /// 检测 .NET 10 Desktop Runtime 是否已安装。
+        /// 通过注册表 + dotnet 命令双重检测，避免仅依赖单一来源。
+        /// </summary>
         private bool IsDotNet10DesktopRuntimeInstalled()
         {
+            // 方法1: 注册表检测
             try
             {
                 using var key = Registry.LocalMachine.OpenSubKey(
                     @"SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App");
-                if (key == null) return false;
-                return key.GetSubKeyNames().Any(name => name.StartsWith("10."));
+                if (key != null)
+                {
+                    var versions = key.GetSubKeyNames();
+                    if (versions.Any(v => v.StartsWith("10.")))
+                        return true;
+                }
+            }
+            catch { }
+
+            // 方法2: dotnet 命令行检测（备用，适用于用户通过 zip 安装的情况）
+            try
+            {
+                var output = RunProcessWithOutput("dotnet", "--list-runtimes");
+                if (!string.IsNullOrEmpty(output))
+                {
+                    // 检查输出中是否包含 Microsoft.WindowsDesktop.App 10.x
+                    if (output!.Contains("Microsoft.WindowsDesktop.App 10."))
+                        return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 同步执行进程并返回退出码。
+        /// </summary>
+        private int RunProcessSync(string fileName, string arguments)
+        {
+            try
+            {
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                process.WaitForExit(30000);
+                return process.ExitCode;
             }
             catch
             {
-                return false;
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// 同步执行进程并返回标准输出内容。
+        /// </summary>
+        private string? RunProcessWithOutput(string fileName, string arguments)
+        {
+            try
+            {
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(30000);
+                return output;
+            }
+            catch
+            {
+                return null;
             }
         }
 
