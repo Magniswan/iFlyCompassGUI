@@ -47,21 +47,32 @@ public class FileImportService : IFileImportService
         }
     }
     
+    // 支持的视频格式
+    private static readonly HashSet<string> SupportedVideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg"
+    };
+
     public async Task<ImportResult> ImportVideoAsync(string sourcePath, string? targetDirectory = null)
     {
         var destDir = string.IsNullOrEmpty(targetDirectory) ? _videosDir : targetDirectory;
 
-        if (!File.Exists(_ffprobePath))
-            return new ImportResult { Success = true, Message = "导入成功（未安装 ffprobe，跳过编码检测）", DestinationPath = Path.Combine(destDir, Path.GetFileName(sourcePath)) };
-
         var ext = Path.GetExtension(sourcePath).ToLower();
-        if (ext != ".mp4")
-            return new ImportResult { Success = false, Message = "仅支持 .mp4 格式" };
+        if (!SupportedVideoExtensions.Contains(ext))
+            return new ImportResult { Success = false, Message = $"不支持的格式: {ext}，支持的格式: {string.Join(", ", SupportedVideoExtensions)}" };
+
+        var destPath = Path.Combine(destDir, Path.GetFileName(sourcePath));
+
+        // 如果 ffprobe 不存在，直接复制文件
+        if (!File.Exists(_ffprobePath))
+        {
+            File.Copy(sourcePath, destPath, true);
+            return new ImportResult { Success = true, Message = "导入成功（未安装 ffprobe，跳过编码检测）", DestinationPath = destPath };
+        }
 
         try
         {
             var codec = await GetVideoCodecAsync(sourcePath);
-            var destPath = Path.Combine(destDir, Path.GetFileName(sourcePath));
 
             if (codec.Contains("hevc", StringComparison.OrdinalIgnoreCase) || codec.Contains("h265", StringComparison.OrdinalIgnoreCase))
             {
@@ -73,7 +84,9 @@ public class FileImportService : IFileImportService
         }
         catch (Exception ex)
         {
-            return new ImportResult { Success = false, Message = $"导入失败: {ex.Message}" };
+            // 编码检测失败时，复制文件并标记需要转换
+            File.Copy(sourcePath, destPath, true);
+            return new ImportResult { Success = true, Message = $"导入成功（编码检测失败: {ex.Message}）", DestinationPath = destPath };
         }
     }
     

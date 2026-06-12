@@ -150,8 +150,144 @@ jobs:
           name: iFlyCompassGUI-${{ steps.version.outputs.version }}-${{ matrix.platform }}
           path: release-output/
 
-  release:
+  build-installer:
     needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: iFlyCompassGUI-${{ steps.version.outputs.version }}-x64
+          path: msix-artifact/
+
+      - name: Decode PFX certificate
+        shell: pwsh
+        run: |
+          New-Item -Path "cert" -ItemType Directory -Force | Out-Null
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.PFX_BASE64 }}")
+          [IO.File]::WriteAllBytes("cert\iFlyCompassGUI.pfx", $pfxBytes)
+
+      - name: Create cert-password.props
+        shell: pwsh
+        run: |
+          @"
+          <Project>
+            <PropertyGroup>
+              <PackageCertificateKeyFile>cert\iFlyCompassGUI.pfx</PackageCertificateKeyFile>
+              <PackageCertificatePassword>${{ secrets.PFX_PASSWORD }}</PackageCertificatePassword>
+            </PropertyGroup>
+          </Project>
+          "@ | Out-File -FilePath "cert\cert-password.props" -Encoding utf8
+
+      - name: Resolve .NET 10 Runtime download URL
+        id: dotnet-url
+        shell: pwsh
+        run: |
+          try {
+            $releases = Invoke-RestMethod "https://dotnetcli.azureedge.net/dotnet/release-metadata/10.0/releases.json"
+            $latestRelease = $releases.releases | Select-Object -First 1
+            $runtimeAsset = $latestRelease."windowsdesktop".files |
+              Where-Object { $_.rid -eq "win-x64" -and $_.name -like "windowsdesktop-runtime-*" } |
+              Select-Object -First 1
+            if (-not $runtimeAsset) {
+              $runtimeAsset = $latestRelease."windowsdesktop".files |
+                Where-Object { $_.name -like "*windowsdesktop-runtime*win-x64*" } |
+                Select-Object -First 1
+            }
+            if ($runtimeAsset) {
+              echo "url=$($runtimeAsset.url)" >> $env:GITHUB_OUTPUT
+              Write-Host "Resolved .NET Runtime URL: $($runtimeAsset.url)"
+            } else {
+              Write-Warning "Could not resolve .NET Runtime URL"
+              echo "url=" >> $env:GITHUB_OUTPUT
+            }
+          } catch {
+            Write-Warning "Failed to query dotnet release API: $_"
+            echo "url=" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Prepare resources and build installer
+        shell: pwsh
+        run: |
+          $resourcesDir = "installer\Bootstrapper\Resources"
+          New-Item -Path $resourcesDir -ItemType Directory -Force | Out-Null
+
+          # Copy MSIX from artifact
+          $msix = Get-ChildItem -Path "msix-artifact" -Filter "*.msix" | Select-Object -First 1
+          if ($msix) {
+            Copy-Item $msix.FullName "$resourcesDir\iFlyCompassGUI.msix" -Force
+            Write-Host "Copied MSIX: $($msix.Name)"
+          } else {
+            Write-Error "No MSIX found in artifact"
+            exit 1
+          }
+
+          # Export CER from PFX
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+            "cert\iFlyCompassGUI.pfx", "${{ secrets.PFX_PASSWORD }}")
+          [IO.File]::WriteAllBytes("$resourcesDir\iFlyCompassGUI.cer", $cert.Export("Cert"))
+          Write-Host "Exported CER certificate"
+
+          # Update .NET Runtime URL in source
+          $dotnetUrl = "${{ steps.dotnet-url.outputs.url }}"
+          if ($dotnetUrl) {
+            $urlsFile = "installer\Bootstrapper\RuntimeUrls.cs"
+            $content = Get-Content $urlsFile -Raw
+            $content = $content -replace 'PLACEHOLDER_DOTNET_RUNTIME_URL', $dotnetUrl
+            Set-Content $urlsFile $content -NoNewline
+            Write-Host "Updated .NET Runtime URL"
+          }
+
+          # Build Bootstrapper
+          msbuild installer\Bootstrapper\Bootstrapper.csproj -p:Configuration=Release -verbosity:minimal
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Bootstrapper build failed"
+            exit 1
+          }
+
+          # Collect output
+          $setupExe = Get-ChildItem -Path "installer\Bootstrapper\bin\Release" -Filter "iFlyCompassGUI-Setup.exe" -Recurse |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $setupExe) {
+            Write-Error "Setup EXE not found"
+            exit 1
+          }
+
+          $releaseDir = "installer-output"
+          New-Item -Path $releaseDir -ItemType Directory -Force | Out-Null
+          Copy-Item $setupExe.FullName "$releaseDir\iFlyCompassGUI-Setup.exe" -Force
+          Write-Host "Installer output: $($setupExe.FullName)"
+          Write-Host "Size: $([math]::Round($setupExe.Length / 1MB, 1)) MB"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iFlyCompassGUI-installer-${{ steps.version.outputs.version }}
+          path: installer-output/
+
+  release:
+    needs: [build, build-installer]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
@@ -200,7 +336,7 @@ jobs:
       - name: Merge artifacts into release-output
         run: |
           mkdir -p release-output
-          find all-artifacts/ -type f \( -name "*.msix" -o -name "*.cer" -o -name "*.ps1" \) -exec cp {} release-output/ \;
+          find all-artifacts/ -type f \( -name "*.msix" -o -name "*.cer" -o -name "*.ps1" -o -name "*.exe" \) -exec cp {} release-output/ \;
           echo "Release assets:"
           ls -lh release-output/
 

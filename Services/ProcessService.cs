@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
+using System.Text.RegularExpressions;
 using iFlyCompassGUI.Helpers;
 
 namespace iFlyCompassGUI.Services;
@@ -259,6 +260,17 @@ public class ProcessService : IProcessService, IDisposable
     
     private int? FindPythonProcessOnPort(int port)
     {
+        // 方法1: 使用 netstat -ano (主要方法)
+        var pid = FindProcessByNetstat(port);
+        if (pid.HasValue) return pid;
+
+        // 方法2: 使用 PowerShell (备用方法，处理复杂网络场景)
+        pid = FindProcessByPowerShell(port);
+        return pid;
+    }
+
+    private int? FindProcessByNetstat(int port)
+    {
         try
         {
             var psi = new ProcessStartInfo
@@ -269,21 +281,31 @@ public class ProcessService : IProcessService, IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            
+
             using var netstat = Process.Start(psi);
             if (netstat == null) return null;
-            
+
             var output = netstat.StandardOutput.ReadToEnd();
             netstat.WaitForExit(5000);
-            
+
             foreach (var line in output.Split('\n'))
             {
-                var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 5) continue;
-                
-                if (parts[0] == "TCP" && parts[1].EndsWith($":{port}") && parts[3] == "LISTENING")
+                var trimmedLine = line.Trim();
+                if (!trimmedLine.StartsWith("TCP") && !trimmedLine.StartsWith("TCPv6")) continue;
+
+                // 使用正则表达式更可靠地解析 netstat 输出
+                // 格式: TCP    0.0.0.0:5002    0.0.0.0:0    LISTENING    12345
+                var match = Regex.Match(trimmedLine, @":(\d+)\s+.*?LISTENING\s+(\d+)$");
+                if (!match.Success)
                 {
-                    if (int.TryParse(parts[4], out var pid) && pid > 0)
+                    // 尝试另一种格式
+                    match = Regex.Match(trimmedLine, @"TCP[v6]?\s+[\[\]0-9.:]+\:(\d+)\s+[\[\]0-9.:]+\s+LISTENING\s+(\d+)");
+                }
+                if (!match.Success) continue;
+
+                if (int.TryParse(match.Groups[1].Value, out var portNum) && portNum == port)
+                {
+                    if (int.TryParse(match.Groups[2].Value, out var pid) && pid > 0)
                     {
                         try
                         {
@@ -300,7 +322,45 @@ public class ProcessService : IProcessService, IDisposable
             }
         }
         catch { }
-        
+
+        return null;
+    }
+
+    private int? FindProcessByPowerShell(int port)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell",
+                Arguments = $"-NoProfile -Command \"Get-NetTCPConnection -LocalPort {port} -State Listen | Select-Object -ExpandProperty OwningProcess\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var ps = Process.Start(psi);
+            if (ps == null) return null;
+
+            var output = ps.StandardOutput.ReadToEnd();
+            ps.WaitForExit(5000);
+
+            if (int.TryParse(output.Trim(), out var pid) && pid > 0)
+            {
+                try
+                {
+                    var proc = Process.GetProcessById(pid);
+                    var procPath = proc.MainModule?.FileName ?? "";
+                    if (procPath.Contains("python", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return pid;
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
         return null;
     }
     

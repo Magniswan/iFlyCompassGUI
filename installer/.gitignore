@@ -1,0 +1,10 @@
+# 构建产物
+bin/
+obj/
+
+# 嵌入资源（构建时从主项目复制）
+Resources/*.msix
+Resources/*.cer
+
+# 下载的运行时安装包（仅本地调试用）
+redist/
