@@ -95,9 +95,9 @@ jobs:
 
       - name: Build and package MSIX
         run: |
-          dotnet msbuild iFlyCompassGUI.csproj `
-            -t:Build `
-            -p:Configuration=Release `
+          dotnet build iFlyCompassGUI.csproj `
+            -c Release `
+            -r win-${{ matrix.platform }} `
             -p:Platform=${{ matrix.platform }} `
             -p:AppxPackage=true `
             -p:GenerateAppxPackageOnBuild=true `
