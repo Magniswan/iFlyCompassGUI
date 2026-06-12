@@ -32,6 +32,13 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
+  <!-- 排除安装程序目录，避免 SDK-style 项目的隐式编译将其纳入 -->
+  <ItemGroup>
+    <Compile Remove="installer\**\*.cs" />
+    <EmbeddedResource Remove="installer\**\*.resx" />
+    <None Remove="installer\**\*" />
+  </ItemGroup>
+
   <!-- Import certificate password from local file (gitignored) -->
   <Import Project="cert\cert-password.props" Condition="Exists('cert\cert-password.props')" />
 
