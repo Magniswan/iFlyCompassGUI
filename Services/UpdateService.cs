@@ -145,13 +145,11 @@ public class UpdateService : IUpdateService
                 // Must drain stdout/stderr to prevent deadlock when buffers fill up
                 var depOutTask = Task.Run(async () =>
                 {
-                    while (!depProcess.StandardOutput.EndOfStream)
-                        await depProcess.StandardOutput.ReadLineAsync();
+                    while (await depProcess.StandardOutput.ReadLineAsync() is not null) { }
                 });
                 var depErrTask = Task.Run(async () =>
                 {
-                    while (!depProcess.StandardError.EndOfStream)
-                        await depProcess.StandardError.ReadLineAsync();
+                    while (await depProcess.StandardError.ReadLineAsync() is not null) { }
                 });
 
                 await Task.WhenAll(depOutTask, depErrTask, depProcess.WaitForExitAsync());
@@ -185,13 +183,11 @@ public class UpdateService : IUpdateService
 
                         var retryOutTask = Task.Run(async () =>
                         {
-                            while (!retryProcess.StandardOutput.EndOfStream)
-                                await retryProcess.StandardOutput.ReadLineAsync();
+                            while (await retryProcess.StandardOutput.ReadLineAsync() is not null) { }
                         });
                         var retryErrTask = Task.Run(async () =>
                         {
-                            while (!retryProcess.StandardError.EndOfStream)
-                                await retryProcess.StandardError.ReadLineAsync();
+                            while (await retryProcess.StandardError.ReadLineAsync() is not null) { }
                         });
 
                         await Task.WhenAll(retryOutTask, retryErrTask, retryProcess.WaitForExitAsync());
@@ -238,13 +234,11 @@ public class UpdateService : IUpdateService
 
         var outTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
-                await process.StandardOutput.ReadLineAsync();
+            while (await process.StandardOutput.ReadLineAsync() is not null) { }
         });
         var errTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
-                await process.StandardError.ReadLineAsync();
+            while (await process.StandardError.ReadLineAsync() is not null) { }
         });
 
         await Task.WhenAll(outTask, errTask, process.WaitForExitAsync());

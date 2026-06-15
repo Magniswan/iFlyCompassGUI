@@ -70,6 +70,7 @@ public partial class App : Application
         });
         
         services.AddSingleton<DispatcherHelper>();
+        services.AddSingleton<ILogAggregatorService, LogAggregatorService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IConfigService, ConfigService>();
         services.AddSingleton<IProcessService, ProcessService>();
@@ -78,6 +79,8 @@ public partial class App : Application
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IAppUpdateService, AppUpdateService>();
         services.AddSingleton<IFileImportService, FileImportService>();
+        services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<IDownloadService, DownloadService>();
         
         services.AddSingleton<LogViewModel>();
         services.AddTransient<MainViewModel>();

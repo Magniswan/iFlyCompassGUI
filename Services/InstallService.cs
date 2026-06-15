@@ -286,11 +286,8 @@ public class InstallService : IInstallService
 
         var outputTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            while (await process.StandardOutput.ReadLineAsync() is { } line)
             {
-                var line = await process.StandardOutput.ReadLineAsync();
-                if (line == null) continue;
-
                 // "Collecting package_name" indicates pip is processing this package
                 var collectingMatch = Regex.Match(line, @"^Collecting\s+(\S+)");
                 if (collectingMatch.Success)
@@ -323,10 +320,7 @@ public class InstallService : IInstallService
 
         var errorTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
-            {
-                await process.StandardError.ReadLineAsync();
-            }
+            while (await process.StandardError.ReadLineAsync() is not null) { }
         });
 
         await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
@@ -364,13 +358,11 @@ public class InstallService : IInstallService
                 // Must drain stdout/stderr to prevent deadlock when buffers fill up
                 var retryOutTask = Task.Run(async () =>
                 {
-                    while (!retryProcess.StandardOutput.EndOfStream)
-                        await retryProcess.StandardOutput.ReadLineAsync();
+                    while (await retryProcess.StandardOutput.ReadLineAsync() is not null) { }
                 });
                 var retryErrTask = Task.Run(async () =>
                 {
-                    while (!retryProcess.StandardError.EndOfStream)
-                        await retryProcess.StandardError.ReadLineAsync();
+                    while (await retryProcess.StandardError.ReadLineAsync() is not null) { }
                 });
 
                 await Task.WhenAll(retryOutTask, retryErrTask, retryProcess.WaitForExitAsync());
@@ -402,13 +394,11 @@ public class InstallService : IInstallService
 
         var outTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
-                await process.StandardOutput.ReadLineAsync();
+            while (await process.StandardOutput.ReadLineAsync() is not null) { }
         });
         var errTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
-                await process.StandardError.ReadLineAsync();
+            while (await process.StandardError.ReadLineAsync() is not null) { }
         });
 
         await Task.WhenAll(outTask, errTask, process.WaitForExitAsync());

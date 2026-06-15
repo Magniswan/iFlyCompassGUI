@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                ContentFrame.Navigate(typeof(HomePage));
+                NavigateToLastPage();
             }
 
 
@@ -62,26 +62,59 @@ public sealed partial class MainWindow : Window
     private void RestoreWindowPosition()
     {
         var settings = _configService.Settings;
-        if (!string.IsNullOrEmpty(settings.LastSelectedPage))
+        if (!string.IsNullOrEmpty(settings.LastSelectedPage) && settings.WindowWidth > 0)
         {
             var appWindow = this.AppWindow;
-            if (settings.WindowWidth > 0) appWindow.Resize(new Windows.Graphics.SizeInt32(settings.WindowWidth, settings.WindowHeight));
+            appWindow.Resize(new Windows.Graphics.SizeInt32(settings.WindowWidth, settings.WindowHeight));
             appWindow.Move(new Windows.Graphics.PointInt32(settings.WindowX, settings.WindowY));
         }
+    }
+
+    private void NavigateToLastPage()
+    {
+        var lastPage = _configService.Settings.LastSelectedPage;
+        Type? pageType = lastPage switch
+        {
+            "Home" => typeof(HomePage),
+            "Novel" => typeof(NovelManagerPage),
+            "Video" => typeof(VideoManagerPage),
+            "AI" => typeof(AIConfigPage),
+            "Users" => typeof(UserManagerPage),
+            "Log" => typeof(LogPage),
+            "About" => typeof(AboutPage),
+            "Settings" => typeof(SettingsPage),
+            _ => typeof(HomePage)
+        };
+
+        ContentFrame.Navigate(pageType);
+
+        // Select the corresponding NavigationViewItem
+        var tag = lastPage ?? "Home";
+        foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems))
+        {
+            if (item is NavigationViewItem nvi && nvi.Tag?.ToString() == tag)
+            {
+                NavView.SelectedItem = nvi;
+                break;
+            }
+        }
+    }
+
+    private void SaveCurrentPage(string tag)
+    {
+        _configService.Settings.LastSelectedPage = tag;
+        _ = _configService.SaveAsync();
     }
     
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
-        if (!string.IsNullOrEmpty(_configService.Settings.LastSelectedPage))
-        {
-            var pos = this.AppWindow.Position;
-            var size = this.AppWindow.Size;
-            _configService.Settings.WindowX = pos.X;
-            _configService.Settings.WindowY = pos.Y;
-            _configService.Settings.WindowWidth = size.Width;
-            _configService.Settings.WindowHeight = size.Height;
-            _ = _configService.SaveAsync();
-        }
+        var pos = this.AppWindow.Position;
+        var size = this.AppWindow.Size;
+        _configService.Settings.WindowX = pos.X;
+        _configService.Settings.WindowY = pos.Y;
+        _configService.Settings.WindowWidth = size.Width;
+        _configService.Settings.WindowHeight = size.Height;
+        _ = _configService.SaveAsync();
     }
     
     public void NavigateToHome()
@@ -144,6 +177,9 @@ public sealed partial class MainWindow : Window
         };
 
         if (pageType != null && ContentFrame.CurrentSourcePageType != pageType)
+        {
             ContentFrame.Navigate(pageType);
+            SaveCurrentPage(tag!);
+        }
     }
 }

@@ -47,6 +47,26 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
+                    <TextBlock Text="数据管理" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="导入或导出 iFlyCompass/instance/ 目录中的数据（小说、视频等）" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="导出数据" Command="{Binding ExportInstanceCommand}"
+                                IsEnabled="{Binding IsExporting, Converter={StaticResource BoolNegationConverter}}"
+                                Style="{StaticResource DefaultButtonStyle}"/>
+                        <Button Content="导入数据" Command="{Binding ImportInstanceCommand}"
+                                IsEnabled="{Binding IsImporting, Converter={StaticResource BoolNegationConverter}}"
+                                Style="{StaticResource DefaultButtonStyle}"/>
+                    </StackPanel>
+                    <ProgressBar Value="{Binding DataTransferProgress}" Maximum="100" Height="6"
+                                 Visibility="{Binding DataTransferStatus, Converter={StaticResource NullToVisibilityConverter}}"/>
+                    <TextBlock Text="{Binding DataTransferStatus}" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
                     <TextBlock Text="应用管理" FontSize="16" FontWeight="SemiBold"/>
                     <Button Content="卸载 iFlyCompass" Command="{Binding UninstallCommand}"
                             Style="{StaticResource DefaultButtonStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"

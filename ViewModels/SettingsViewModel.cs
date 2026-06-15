@@ -11,6 +11,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IProcessService _processService;
     private readonly IInstallService _installService;
     private readonly IDialogService _dialogService;
+    private readonly IDataService _dataService;
 
     [ObservableProperty]
     private bool _autoStartApp;
@@ -24,14 +25,28 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isUninstalling;
 
-    public event EventHandler? RequestNavigateWelcome;
+    [ObservableProperty]
+    private bool _isExporting;
 
-    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService)
+    [ObservableProperty]
+    private bool _isImporting;
+
+    [ObservableProperty]
+    private double _dataTransferProgress;
+
+    [ObservableProperty]
+    private string _dataTransferStatus = "";
+
+    public event EventHandler? RequestNavigateWelcome;
+    public event EventHandler? InstanceDataChanged;
+
+    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService)
     {
         _configService = configService;
         _processService = processService;
         _installService = installService;
         _dialogService = dialogService;
+        _dataService = dataService;
         LoadSettings();
     }
 
@@ -50,6 +65,14 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnRememberWindowStateChanged(bool value)
     {
+        if (value)
+        {
+            _configService.Settings.LastSelectedPage = "Home"; // Mark as enabled
+        }
+        else
+        {
+            _configService.Settings.LastSelectedPage = "";
+        }
         _ = _configService.SaveAsync();
     }
 
@@ -106,6 +129,100 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsUninstalling = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportInstanceAsync()
+    {
+        var destFolder = await _dialogService.ShowFolderPickerAsync();
+        if (string.IsNullOrEmpty(destFolder)) return;
+
+        IsExporting = true;
+        DataTransferProgress = 0;
+        DataTransferStatus = "正在导出...";
+
+        try
+        {
+            var progress = new Progress<DataTransferProgress>(p =>
+            {
+                DataTransferProgress = p.Progress;
+                DataTransferStatus = $"导出中 ({p.CurrentFile}/{p.TotalFiles}): {p.CurrentFileName}";
+            });
+
+            var result = await _dataService.ExportInstanceAsync(destFolder, progress);
+            DataTransferStatus = result.Message;
+            DataTransferProgress = result.Success ? 100 : DataTransferProgress;
+
+            if (result.Success)
+            {
+                DataTransferStatus = "";
+                await _dialogService.ShowInfoAsync("导出完成", result.Message);
+            }
+            else
+                await _dialogService.ShowInfoAsync("导出失败", result.Message);
+        }
+        catch (Exception ex)
+        {
+            DataTransferStatus = $"导出失败: {ex.Message}";
+            await _dialogService.ShowInfoAsync("导出失败", ex.Message);
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportInstanceAsync()
+    {
+        if (_processService.IsRunning)
+        {
+            await _dialogService.ShowInfoAsync("无法导入", "请先停止 app.py 运行后再导入数据。");
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmAsync("确认导入", "导入将覆盖 instance 目录中的现有数据，是否继续？");
+        if (!confirmed) return;
+
+        var sourceFolder = await _dialogService.ShowFolderPickerAsync();
+        if (string.IsNullOrEmpty(sourceFolder)) return;
+
+        IsImporting = true;
+        DataTransferProgress = 0;
+        DataTransferStatus = "正在导入...";
+
+        try
+        {
+            var progress = new Progress<DataTransferProgress>(p =>
+            {
+                DataTransferProgress = p.Progress;
+                DataTransferStatus = $"导入中 ({p.CurrentFile}/{p.TotalFiles}): {p.CurrentFileName}";
+            });
+
+            var result = await _dataService.ImportInstanceAsync(sourceFolder, progress);
+            DataTransferStatus = result.Message;
+            DataTransferProgress = result.Success ? 100 : DataTransferProgress;
+
+            if (result.Success)
+            {
+                DataTransferStatus = "";
+                InstanceDataChanged?.Invoke(this, EventArgs.Empty);
+                await _dialogService.ShowInfoAsync("导入完成", result.Message);
+            }
+            else
+            {
+                await _dialogService.ShowInfoAsync("导入失败", result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            DataTransferStatus = $"导入失败: {ex.Message}";
+            await _dialogService.ShowInfoAsync("导入失败", ex.Message);
+        }
+        finally
+        {
+            IsImporting = false;
         }
     }
 

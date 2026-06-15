@@ -12,10 +12,12 @@ public class FileImportService : IFileImportService
     private readonly string _videosDir;
     private readonly string _ffmpegPath;
     private readonly string _ffprobePath;
+    private readonly ILogAggregatorService _logAggregator;
     private bool? _gpuAccelAvailable;
 
-    public FileImportService()
+    public FileImportService(ILogAggregatorService logAggregator)
     {
+        _logAggregator = logAggregator;
         _baseDir = PathHelper.DataDirectory;
         _novelsDir = Path.Combine(_baseDir, "iFlyCompass", "instance", "novels");
         _videosDir = Path.Combine(_baseDir, "iFlyCompass", "instance", "videos");
@@ -119,6 +121,7 @@ public class FileImportService : IFileImportService
             process.ErrorDataReceived += (sender, e) =>
             {
                 if (string.IsNullOrEmpty(e.Data)) return;
+                _logAggregator.AddLog("ffmpeg", "INFO", e.Data);
                 var match = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2}\.\d+)");
                 if (match.Success && duration > 0 && progress != null)
                 {
@@ -132,32 +135,32 @@ public class FileImportService : IFileImportService
                     progress.Report(currentTime / duration);
                 }
             };
-            
+
             process.Start();
             process.BeginErrorReadLine();
-            
+
             using var registration = cancellationToken.Register(() =>
             {
                 try { process.Kill(true); } catch { }
             });
-            
+
             await process.WaitForExitAsync(cancellationToken);
-            
+
             if (cancellationToken.IsCancellationRequested)
             {
                 if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
                 return new ConversionResult { Success = false, Message = "已取消转换" };
             }
-            
+
             if (process.ExitCode != 0 && useGpu)
             {
                 if (File.Exists(destPath)) File.Delete(destPath);
-                return await ConvertWithCpuFallbackAsync(sourcePath, destPath, progress, duration, cancellationToken);
+                return await ConvertWithCpuFallbackAsync(sourcePath, destPath, "", progress, duration, cancellationToken);
             }
-            
+
             if (process.ExitCode != 0)
                 return new ConversionResult { Success = false, Message = "转换失败" };
-            
+
             return new ConversionResult { Success = true, Message = useGpu ? "转换成功（GPU 加速）" : "转换成功", DestinationPath = destPath, SourceCodec = useGpu ? "hevc_nvenc" : "libx265" };
         }
         catch (OperationCanceledException)
@@ -170,10 +173,102 @@ public class FileImportService : IFileImportService
             return new ConversionResult { Success = false, Message = $"转换失败: {ex.Message}" };
         }
     }
-    
-    private async Task<ConversionResult> ConvertWithCpuFallbackAsync(string sourcePath, string destPath, IProgress<double>? progress, double duration, CancellationToken cancellationToken = default)
+
+    public async Task<ConversionResult> ConvertVideoWithResolutionAsync(string sourcePath, string destPath, int? width = null, int? height = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
-        var arguments = $"-i \"{sourcePath}\" -c:v libx265 -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y";
+        if (!File.Exists(_ffmpegPath))
+            return new ConversionResult { Success = false, Message = "未找到 FFmpeg" };
+
+        try
+        {
+            var useGpu = await IsGpuAccelAvailableAsync();
+
+            // 构建 scale 滤镜
+            var scaleFilter = "";
+            if (width.HasValue || height.HasValue)
+            {
+                var w = width.HasValue ? width.Value.ToString() : "-1";
+                var h = height.HasValue ? height.Value.ToString() : "-1";
+                scaleFilter = $" -vf scale={w}:{h}";
+            }
+
+            var arguments = useGpu
+                ? $"-hwaccel cuda -i \"{sourcePath}\"{scaleFilter} -c:v hevc_nvenc -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y"
+                : $"-i \"{sourcePath}\"{scaleFilter} -c:v libx265 -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y";
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = _ffmpegPath,
+                Arguments = arguments,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var duration = await GetVideoDurationAsync(sourcePath);
+            var lastProgressTime = 0L;
+
+            process.ErrorDataReceived += (sender, e) =>
+            {
+                if (string.IsNullOrEmpty(e.Data)) return;
+                _logAggregator.AddLog("ffmpeg", "INFO", e.Data);
+                var match = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2}\.\d+)");
+                if (match.Success && duration > 0 && progress != null)
+                {
+                    var now = Environment.TickCount64;
+                    if (now - lastProgressTime < 200) return;
+                    lastProgressTime = now;
+                    var hours = double.Parse(match.Groups[1].Value);
+                    var minutes = double.Parse(match.Groups[2].Value);
+                    var seconds = double.Parse(match.Groups[3].Value);
+                    var currentTime = hours * 3600 + minutes * 60 + seconds;
+                    progress.Report(currentTime / duration);
+                }
+            };
+
+            process.Start();
+            process.BeginErrorReadLine();
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try { process.Kill(true); } catch { }
+            });
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
+                return new ConversionResult { Success = false, Message = "已取消转换" };
+            }
+
+            if (process.ExitCode != 0 && useGpu)
+            {
+                if (File.Exists(destPath)) File.Delete(destPath);
+                return await ConvertWithCpuFallbackAsync(sourcePath, destPath, scaleFilter, progress, duration, cancellationToken);
+            }
+
+            if (process.ExitCode != 0)
+                return new ConversionResult { Success = false, Message = "转换失败" };
+
+            var resInfo = (width.HasValue || height.HasValue) ? $" ({width ?? -1}x{height ?? -1})" : "";
+            return new ConversionResult { Success = true, Message = $"转换成功{resInfo}" + (useGpu ? "（GPU 加速）" : ""), DestinationPath = destPath };
+        }
+        catch (OperationCanceledException)
+        {
+            if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
+            return new ConversionResult { Success = false, Message = "已取消转换" };
+        }
+        catch (Exception ex)
+        {
+            return new ConversionResult { Success = false, Message = $"转换失败: {ex.Message}" };
+        }
+    }
+
+    private async Task<ConversionResult> ConvertWithCpuFallbackAsync(string sourcePath, string destPath, string scaleFilter, IProgress<double>? progress, double duration, CancellationToken cancellationToken = default)
+    {
+        var arguments = $"-i \"{sourcePath}\"{scaleFilter} -c:v libx265 -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y";
         var psi = new ProcessStartInfo
         {
             FileName = _ffmpegPath,
@@ -182,13 +277,14 @@ public class FileImportService : IFileImportService
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        
+
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var lastProgressTime = 0L;
-        
+
         process.ErrorDataReceived += (sender, e) =>
         {
             if (string.IsNullOrEmpty(e.Data)) return;
+            _logAggregator.AddLog("ffmpeg", "INFO", e.Data);
             var match = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2}\.\d+)");
             if (match.Success && duration > 0 && progress != null)
             {
@@ -202,26 +298,26 @@ public class FileImportService : IFileImportService
                 progress.Report(currentTime / duration);
             }
         };
-        
+
         process.Start();
         process.BeginErrorReadLine();
-        
+
         using var registration = cancellationToken.Register(() =>
         {
             try { process.Kill(true); } catch { }
         });
-        
+
         await process.WaitForExitAsync(cancellationToken);
-        
+
         if (cancellationToken.IsCancellationRequested)
         {
             if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
             return new ConversionResult { Success = false, Message = "已取消转换" };
         }
-        
+
         if (process.ExitCode != 0)
             return new ConversionResult { Success = false, Message = "转换失败（GPU 和 CPU 均失败）" };
-        
+
         return new ConversionResult { Success = true, Message = "转换成功（CPU 回退）", DestinationPath = destPath };
     }
     

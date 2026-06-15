@@ -56,6 +56,12 @@
                 <Button Content="测试连接" Command="{Binding TestConnectionCommand}" IsEnabled="{Binding IsTesting, Converter={StaticResource BoolNegationConverter}}"/>
                 <ProgressRing IsActive="{Binding IsTesting}" Width="20" Height="20" VerticalAlignment="Center"/>
             </StackPanel>
+
+            <InfoBar IsOpen="{Binding ShowConnectionResult}"
+                     Severity="{Binding ConnectionSeverity}"
+                     Title="{Binding ConnectionResultTitle}"
+                     Message="{Binding ConnectionResultMessage}"
+                     IsClosable="True"/>
             
             <TextBlock Text="{Binding StatusMessage}" Opacity="0.7"/>
         </StackPanel>

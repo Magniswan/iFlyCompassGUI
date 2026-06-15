@@ -10,10 +10,12 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <conv:IntToVisibilityConverter x:Key="IntToVisibilityConverter"/>
         <conv:StringFormatConverter x:Key="StringFormatConverter"/>
+        <conv:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
     </Page.Resources>
 
     <Grid Background="Transparent" Padding="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -35,6 +37,12 @@
                 </AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator/>
+            <AppBarButton Label="下载视频" Command="{Binding ToggleDownloadPanelCommand}">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE896;"/>
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator/>
             <AppBarButton Label="新建文件夹" Command="{Binding CreateFolderCommand}">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE8F4;"/>
@@ -42,7 +50,66 @@
             </AppBarButton>
         </CommandBar>
 
+        <!-- 下载面板 -->
         <Border Grid.Row="2" Background="{StaticResource CardAcrylicBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="20" Margin="0,0,0,8"
+                Visibility="{Binding IsDownloadPanelOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="下载视频" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="收起" Command="{Binding ToggleDownloadPanelCommand}"
+                            Padding="12,4" FontSize="12" VerticalAlignment="Center"/>
+                </Grid>
+
+                <TextBox Header="下载链接" PlaceholderText="输入 HTTP/HTTPS 链接或磁力链接 (magnet:?...)"
+                         Text="{Binding DownloadUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolNegationConverter}}"/>
+
+                <InfoBar IsOpen="{Binding IsBtLink, Mode=OneWay}" Severity="Informational"
+                         Title="BT 磁力链接" Message="将使用 aria2c 下载" IsClosable="False"/>
+
+                <ToggleSwitch Header="下载后转编码 (H.265)"
+                              IsOn="{Binding ConvertAfterDownload, Mode=TwoWay}"
+                              OnContent="开" OffContent="关"/>
+
+                <ComboBox Header="画质" ItemsSource="{Binding PresetResolutions}"
+                          SelectedItem="{Binding SelectedPresetResolution, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch"
+                          IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolNegationConverter}}"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="12"
+                            Visibility="{Binding UseCustomResolution, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <NumberBox Header="宽度 (0 = 保持比例)" Value="{Binding CustomWidth, Mode=TwoWay}"
+                               Minimum="0" Maximum="7680" SmallChange="2"
+                               SpinButtonPlacementMode="Compact" Width="160"
+                               IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolNegationConverter}}"/>
+                    <NumberBox Header="高度 (0 = 保持比例)" Value="{Binding CustomHeight, Mode=TwoWay}"
+                               Minimum="0" Maximum="4320" SmallChange="2"
+                               SpinButtonPlacementMode="Compact" Width="160"
+                               IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolNegationConverter}}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="开始下载" Command="{Binding StartDownloadCommand}"
+                            Style="{StaticResource AccentButtonStyle}"
+                            IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolNegationConverter}}"/>
+                    <Button Content="取消下载" Command="{Binding CancelDownloadCommand}"
+                            Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </StackPanel>
+
+                <ProgressBar Value="{Binding DownloadProgress}" Maximum="100" Height="6"
+                             Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <Grid ColumnDefinitions="*,Auto,Auto"
+                      Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Grid.Column="0" Text="{Binding DownloadStatus}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding DownloadEta}" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    <TextBlock Grid.Column="2" Text="{Binding DownloadSpeed}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3" Background="{StaticResource CardAcrylicBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="16" Margin="0,0,0,8"
                 Visibility="{Binding IsConverting, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -58,7 +125,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="3" ColumnDefinitions="280,*">
+        <Grid Grid.Row="4" ColumnDefinitions="280,*">
             <Border Grid.Column="0" Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="8" Margin="0,0,12,0">
@@ -141,6 +208,6 @@
             </Border>
         </Grid>
 
-        <TextBlock Grid.Row="4" Text="{Binding StatusMessage}" Opacity="0.6" Margin="0,8,0,0"/>
+        <TextBlock Grid.Row="5" Text="{Binding StatusMessage}" Opacity="0.6" Margin="0,8,0,0"/>
     </Grid>
 </Page>

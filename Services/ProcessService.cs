@@ -9,6 +9,7 @@ public class ProcessService : IProcessService, IDisposable
 {
     private Process? _process;
     private readonly DispatcherHelper _dispatcherHelper;
+    private readonly ILogAggregatorService _logAggregator;
     private readonly string _pythonPath;
     private readonly string _appPyPath;
     private readonly string _baseDir;
@@ -19,9 +20,10 @@ public class ProcessService : IProcessService, IDisposable
     public event EventHandler<bool>? RunningStateChanged;
     public event EventHandler<string>? LogOutputReceived;
 
-    public ProcessService(DispatcherHelper dispatcherHelper)
+    public ProcessService(DispatcherHelper dispatcherHelper, ILogAggregatorService logAggregator)
     {
         _dispatcherHelper = dispatcherHelper;
+        _logAggregator = logAggregator;
         _baseDir = PathHelper.DataDirectory;
         _pythonDir = Path.Combine(_baseDir, "python");
         _pythonPath = Path.Combine(_pythonDir, "python.exe");
@@ -176,9 +178,10 @@ public class ProcessService : IProcessService, IDisposable
             {
                 var line = await reader.ReadLineAsync(_cts.Token);
                 if (line == null) break;
-                
+
                 var formatted = $"[{DateTime.Now:HH:mm:ss}] [{level}] {line}";
                 _dispatcherHelper.RunOnUIThread(() => LogOutputReceived?.Invoke(this, formatted));
+                _logAggregator.AddLog("Python", level, line);
             }
         }
         catch (OperationCanceledException) { }

@@ -26,6 +26,12 @@ public partial class HomeViewModel : ObservableObject
     
     [ObservableProperty]
     private bool _isToggling;
+
+    [ObservableProperty]
+    private bool _showCrashWarning;
+
+    [ObservableProperty]
+    private string _crashMessage = "";
     
     private DateTime _startTime;
     private System.Timers.Timer? _uptimeTimer;
@@ -36,6 +42,7 @@ public partial class HomeViewModel : ObservableObject
         _configService = configService;
         _dispatcherHelper = dispatcherHelper;
         _processService.RunningStateChanged += OnRunningStateChanged;
+        _processService.LogOutputReceived += OnLogOutputReceived;
         IsRunning = _processService.IsRunning;
         StatusText = IsRunning ? "运行中" : "已停止";
         DetectVersion();
@@ -73,9 +80,11 @@ public partial class HomeViewModel : ObservableObject
         IsRunning = isRunning;
         StatusText = isRunning ? "运行中" : "已停止";
         IsToggling = false;
-        
+
         if (isRunning)
         {
+            ShowCrashWarning = false;
+            CrashMessage = "";
             _startTime = DateTime.Now;
             _uptimeTimer = new System.Timers.Timer(1000);
             _uptimeTimer.Elapsed += (s, e) =>
@@ -92,6 +101,18 @@ public partial class HomeViewModel : ObservableObject
             _uptimeTimer?.Dispose();
             _uptimeTimer = null;
             UptimeText = "00:00:00";
+        }
+    }
+
+    private void OnLogOutputReceived(object? sender, string logLine)
+    {
+        if (logLine.Contains("进程异常退出"))
+        {
+            _dispatcherHelper.RunOnUIThread(() =>
+            {
+                ShowCrashWarning = true;
+                CrashMessage = "服务进程异常退出，请检查日志了解详情。你可以尝试重启服务。";
+            });
         }
     }
     

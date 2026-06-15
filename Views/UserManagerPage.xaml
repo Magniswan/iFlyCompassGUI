@@ -97,6 +97,13 @@
                 </ListView.ItemTemplate>
             </ListView>
 
+            <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Spacing="8" Visibility="{Binding Users.Count, Converter={StaticResource IntToVisibilityConverter}, ConverterParameter=0}">
+                <FontIcon Glyph="&#xE716;" FontSize="48" Opacity="0.3" HorizontalAlignment="Center"/>
+                <TextBlock Text="暂无用户，点击上方添加" Opacity="0.5" HorizontalAlignment="Center"/>
+                <Button Content="加载用户列表" Command="{Binding LoadUsersCommand}" HorizontalAlignment="Center"/>
+            </StackPanel>
+
             <ProgressRing Grid.Row="2" IsActive="{Binding IsLoading}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Grid>
     </Grid>

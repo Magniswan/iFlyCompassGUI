@@ -29,18 +29,18 @@ public static class EncodingHelper
     {
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
         var bom = new byte[4];
-        int read = fs.Read(bom, 0, 4);
+        fs.ReadExactly(bom, 0, 4);
 
         // 检查 BOM
         foreach (var (signature, encoding) in BomSignatures)
         {
-            if (read >= signature.Length && bom.Take(signature.Length).SequenceEqual(signature))
+            if (bom.Take(signature.Length).SequenceEqual(signature))
                 return (true, encoding);
         }
 
         fs.Position = 0;
         var buffer = new byte[Math.Min(4096, fs.Length)];
-        fs.Read(buffer, 0, buffer.Length);
+        fs.ReadExactly(buffer, 0, buffer.Length);
 
         // 尝试 UTF-8 (无 BOM)
         try

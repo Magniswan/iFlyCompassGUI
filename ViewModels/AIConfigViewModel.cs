@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using iFlyCompassGUI.Helpers;
+using Microsoft.UI.Xaml.Controls;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -21,6 +22,21 @@ public partial class AIConfigViewModel : ObservableObject
     
     [ObservableProperty]
     private bool _isTesting;
+
+    [ObservableProperty]
+    private bool _isConnectionSuccess;
+
+    [ObservableProperty]
+    private bool _showConnectionResult;
+
+    [ObservableProperty]
+    private string _connectionResultMessage = "";
+
+    [ObservableProperty]
+    private InfoBarSeverity _connectionSeverity = InfoBarSeverity.Success;
+
+    [ObservableProperty]
+    private string _connectionResultTitle = "";
     
     [ObservableProperty]
     private int _maxTokens = 2048;
@@ -179,6 +195,7 @@ public partial class AIConfigViewModel : ObservableObject
         }
         
         IsTesting = true;
+        ShowConnectionResult = false;
         try
         {
             using var client = new HttpClient();
@@ -192,10 +209,20 @@ public partial class AIConfigViewModel : ObservableObject
             
             var modelsUrl = $"{baseUrl.TrimEnd('/')}/v1/models";
             var response = await client.GetAsync(modelsUrl);
-            StatusMessage = response.IsSuccessStatusCode ? "连接成功！" : $"连接失败: {response.StatusCode}";
+            IsConnectionSuccess = response.IsSuccessStatusCode;
+            ConnectionResultMessage = response.IsSuccessStatusCode ? "连接成功！API 服务可用。" : $"连接失败: HTTP {(int)response.StatusCode}";
+            ConnectionSeverity = response.IsSuccessStatusCode ? InfoBarSeverity.Success : InfoBarSeverity.Error;
+            ConnectionResultTitle = response.IsSuccessStatusCode ? "连接成功" : "连接失败";
+            ShowConnectionResult = true;
+            StatusMessage = IsConnectionSuccess ? "连接成功！" : $"连接失败: {response.StatusCode}";
         }
         catch (Exception ex)
         {
+            IsConnectionSuccess = false;
+            ConnectionResultMessage = $"测试失败: {ex.Message}";
+            ConnectionSeverity = InfoBarSeverity.Error;
+            ConnectionResultTitle = "连接失败";
+            ShowConnectionResult = true;
             StatusMessage = $"测试失败: {ex.Message}";
         }
         finally

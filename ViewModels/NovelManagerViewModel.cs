@@ -39,23 +39,39 @@ public partial class NovelManagerViewModel : ObservableObject
     [RelayCommand]
     private async Task ImportNovelAsync()
     {
-        var path = await _dialogService.ShowOpenFilePickerAsync([".txt"]);
-        if (path == null) return;
-        
-        StatusMessage = "正在导入...";
-        var result = await _fileImportService.ImportNovelAsync(path);
-        StatusMessage = result.Message;
-        if (result.Success) LoadNovels();
+        var paths = await _dialogService.ShowOpenMultipleFilePickerAsync([".txt"]);
+        if (paths == null || paths.Count == 0) return;
+
+        var imported = 0;
+        var failed = 0;
+        foreach (var path in paths)
+        {
+            StatusMessage = $"正在导入 {imported + failed + 1}/{paths.Count}...";
+            var result = await _fileImportService.ImportNovelAsync(path);
+            if (result.Success)
+                imported++;
+            else
+                failed++;
+        }
+
+        LoadNovels();
+        StatusMessage = failed > 0
+            ? $"导入完成: 成功 {imported} 个，失败 {failed} 个"
+            : $"成功导入 {imported} 本小说";
     }
     
     [RelayCommand]
-    private void DeleteNovel(string fileName)
+    private async Task DeleteNovelAsync(string fileName)
     {
+        var confirm = await _dialogService.ShowConfirmAsync("确认删除", $"确定要删除小说「{fileName}」吗？此操作不可撤销。");
+        if (!confirm) return;
+
         var path = Path.Combine(_novelsDir, fileName);
         if (File.Exists(path))
         {
             File.Delete(path);
             LoadNovels();
+            StatusMessage = $"已删除: {fileName}";
         }
     }
 }

@@ -21,6 +21,13 @@
     <PackageCertificateThumbprint>4FA1EB1BCB5DF70F5584FB968F65B85D683BAA98</PackageCertificateThumbprint>
     <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
     <DefaultLanguage>zh-cn</DefaultLanguage>
+    <GenerateAppxSymbolPackage>Disabled</GenerateAppxSymbolPackage>
+    <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+  </PropertyGroup>
+
+  <!-- Suppress mspdbcmf.exe warning: project is unpackaged, no symbol package needed -->
+  <PropertyGroup>
+    <MsPdbCmfExeFullpath>none</MsPdbCmfExeFullpath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +44,11 @@
     <Compile Remove="installer\**\*.cs" />
     <EmbeddedResource Remove="installer\**\*.resx" />
     <None Remove="installer\**\*" />
+  </ItemGroup>
+
+  <!-- 将 tools 目录中的 aria2c 等工具包含到发布输出 -->
+  <ItemGroup>
+    <Content Include="tools\**\*" CopyToOutputDirectory="PreserveNewest" Link="tools\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- Import certificate password from local file (gitignored) -->

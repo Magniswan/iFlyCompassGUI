@@ -7,6 +7,10 @@
     <ScrollViewer Background="Transparent">
         <StackPanel Padding="32" Spacing="24" MaxWidth="800" HorizontalAlignment="Left">
             <TextBlock Text="主页" FontSize="28" FontWeight="Bold"/>
+
+            <InfoBar IsOpen="{Binding ShowCrashWarning}" Severity="Error"
+                     Title="服务异常退出" Message="{Binding CrashMessage}"
+                     IsClosable="True"/>
             
             <Border Background="{StaticResource CardAcrylicBrush}" 
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
@@ -39,10 +43,11 @@
                                 Orientation="Horizontal" Spacing="12">
                         <Button Content="{Binding IsRunning, Converter={StaticResource BoolToStartStopConverter}}" 
                                 Command="{Binding ToggleServiceCommand}" Style="{StaticResource AccentButtonStyle}" 
-                                MinWidth="120"/>
+                                MinWidth="120" IsEnabled="{Binding IsToggling, Converter={StaticResource BoolNegationConverter}}"/>
                         <Button Content="重启服务" Command="{Binding RestartServiceCommand}" 
                                 IsEnabled="{Binding IsRunning}" MinWidth="100"/>
                         <Button Content="打开浏览器" Command="{Binding OpenBrowserCommand}" MinWidth="100"/>
+                        <ProgressRing IsActive="{Binding IsToggling}" Width="20" Height="20" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
