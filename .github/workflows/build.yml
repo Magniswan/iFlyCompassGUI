@@ -335,12 +335,32 @@ jobs:
           echo "Release assets:"
           ls -lh release-output/
 
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            echo "Previous tag: $PREV_TAG"
+            LOG=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "No previous tag found, using last 30 commits"
+            LOG=$(git log -30 --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Write to file for multiline output
+          echo "$LOG" > changelog.txt
+          echo "Changelog:"
+          cat changelog.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: iFlyCompassGUI v${{ steps.version.outputs.version }}
+          body_path: changelog.txt
           draft: false
           prerelease: false
-          generate_release_notes: true
+          make_latest: true
           files: release-output/*
