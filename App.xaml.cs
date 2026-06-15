@@ -81,7 +81,8 @@ public partial class App : Application
         services.AddSingleton<IFileImportService, FileImportService>();
         services.AddSingleton<IDataService, DataService>();
         services.AddSingleton<IDownloadService, DownloadService>();
-        
+        services.AddSingleton<IDownloadQueueService, DownloadQueueService>();
+
         services.AddSingleton<LogViewModel>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<WelcomeViewModel>();

@@ -12,6 +12,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IInstallService _installService;
     private readonly IDialogService _dialogService;
     private readonly IDataService _dataService;
+    private readonly IDownloadQueueService _downloadQueueService;
 
     [ObservableProperty]
     private bool _autoStartApp;
@@ -37,16 +38,20 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _dataTransferStatus = "";
 
+    [ObservableProperty]
+    private int _maxConcurrentDownloads = 3;
+
     public event EventHandler? RequestNavigateWelcome;
     public event EventHandler? InstanceDataChanged;
 
-    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService)
+    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService, IDownloadQueueService downloadQueueService)
     {
         _configService = configService;
         _processService = processService;
         _installService = installService;
         _dialogService = dialogService;
         _dataService = dataService;
+        _downloadQueueService = downloadQueueService;
         LoadSettings();
     }
 
@@ -55,6 +60,7 @@ public partial class SettingsViewModel : ObservableObject
         AutoStartApp = _configService.Settings.AutoStartApp;
         RememberWindowState = !string.IsNullOrEmpty(_configService.Settings.LastSelectedPage);
         GitHubRepoUrl = _configService.Settings.GitHubRepoUrl;
+        MaxConcurrentDownloads = _configService.Settings.MaxConcurrentDownloads;
     }
 
     partial void OnAutoStartAppChanged(bool value)
@@ -80,6 +86,14 @@ public partial class SettingsViewModel : ObservableObject
     {
         _configService.Settings.GitHubRepoUrl = value;
         _ = _configService.SaveAsync();
+    }
+
+    partial void OnMaxConcurrentDownloadsChanged(int value)
+    {
+        value = Math.Max(1, Math.Min(10, value));
+        _configService.Settings.MaxConcurrentDownloads = value;
+        _ = _configService.SaveAsync();
+        _downloadQueueService.UpdateMaxConcurrency(value);
     }
 
     [RelayCommand]

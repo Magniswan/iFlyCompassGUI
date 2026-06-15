@@ -18,7 +18,6 @@ public sealed partial class VideoManagerPage : Page
     private void OnRootFolderClick(object sender, RoutedEventArgs e)
     {
         ViewModel.SelectedFolder = null;
-        VideoListView.ItemsSource = ViewModel.RootVideos;
     }
 
     private void OnFolderClick(object sender, RoutedEventArgs e)
@@ -26,7 +25,6 @@ public sealed partial class VideoManagerPage : Page
         if (sender is Button button && button.Tag is VideoFolder folder)
         {
             ViewModel.SelectedFolder = folder;
-            VideoListView.ItemsSource = folder.Videos;
         }
     }
 
@@ -51,6 +49,14 @@ public sealed partial class VideoManagerPage : Page
         if (sender is Button button && button.Tag is VideoItem video)
         {
             ViewModel.DeleteVideoCommand.Execute(video);
+        }
+    }
+
+    private void OnRenameVideoClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is VideoItem video)
+        {
+            ViewModel.RenameVideoCommand.Execute(video);
         }
     }
 
@@ -83,6 +89,37 @@ public sealed partial class VideoManagerPage : Page
             }
 
             menuFlyout.ShowAt(button);
+        }
+    }
+
+    private void OnCancelDownloadTaskClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is DownloadTaskItem task)
+        {
+            ViewModel.CancelDownloadTaskCommand.Execute(task);
+        }
+    }
+
+    private void OnRemoveDownloadTaskClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is DownloadTaskItem task)
+        {
+            ViewModel.RemoveDownloadTaskCommand.Execute(task);
+        }
+    }
+
+    private void OnVideoListViewSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListView listView)
+        {
+            ViewModel.SelectedVideos.Clear();
+            foreach (var item in listView.SelectedItems)
+            {
+                if (item is VideoItem video)
+                {
+                    ViewModel.SelectedVideos.Add(video);
+                }
+            }
         }
     }
 }

@@ -266,6 +266,209 @@ public class FileImportService : IFileImportService
         }
     }
 
+    public async Task<ConversionResult> ConvertVideoAsync(string sourcePath, string destPath, string codec = "h265", int? width = null, int? height = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(_ffmpegPath))
+            return new ConversionResult { Success = false, Message = "未找到 FFmpeg" };
+
+        try
+        {
+            var useGpu = await IsGpuAccelAvailableAsync();
+            var isH265 = codec.Equals("h265", StringComparison.OrdinalIgnoreCase) ||
+                         codec.Equals("hevc", StringComparison.OrdinalIgnoreCase);
+
+            // 构建 scale 滤镜
+            var scaleFilter = "";
+            if (width.HasValue || height.HasValue)
+            {
+                var w = width.HasValue ? width.Value.ToString() : "-1";
+                var h = height.HasValue ? height.Value.ToString() : "-1";
+                scaleFilter = $" -vf scale={w}:{h}";
+            }
+
+            string arguments;
+            if (isH265)
+            {
+                arguments = useGpu
+                    ? $"-hwaccel cuda -i \"{sourcePath}\"{scaleFilter} -c:v hevc_nvenc -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y"
+                    : $"-i \"{sourcePath}\"{scaleFilter} -c:v libx265 -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y";
+            }
+            else
+            {
+                arguments = useGpu
+                    ? $"-hwaccel cuda -i \"{sourcePath}\"{scaleFilter} -c:v h264_nvenc -crf 23 -c:a copy \"{destPath}\" -y"
+                    : $"-i \"{sourcePath}\"{scaleFilter} -c:v libx264 -crf 23 -preset medium -c:a copy \"{destPath}\" -y";
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = _ffmpegPath,
+                Arguments = arguments,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var duration = await GetVideoDurationAsync(sourcePath);
+            var lastProgressTime = 0L;
+
+            process.ErrorDataReceived += (sender, e) =>
+            {
+                if (string.IsNullOrEmpty(e.Data)) return;
+                _logAggregator.AddLog("ffmpeg", "INFO", e.Data);
+                var match = Regex.Match(e.Data, @"time=(\d{2}):(\d{2}):(\d{2}\.\d+)");
+                if (match.Success && duration > 0 && progress != null)
+                {
+                    var now = Environment.TickCount64;
+                    if (now - lastProgressTime < 200) return;
+                    lastProgressTime = now;
+                    var hours = double.Parse(match.Groups[1].Value);
+                    var minutes = double.Parse(match.Groups[2].Value);
+                    var seconds = double.Parse(match.Groups[3].Value);
+                    var currentTime = hours * 3600 + minutes * 60 + seconds;
+                    progress.Report(currentTime / duration);
+                }
+            };
+
+            process.Start();
+            process.BeginErrorReadLine();
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try { process.Kill(true); } catch { }
+            });
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
+                return new ConversionResult { Success = false, Message = "已取消转换" };
+            }
+
+            if (process.ExitCode != 0 && useGpu)
+            {
+                if (File.Exists(destPath)) File.Delete(destPath);
+                return await ConvertWithCpuFallbackAsync(sourcePath, destPath, scaleFilter, progress, duration, cancellationToken);
+            }
+
+            if (process.ExitCode != 0)
+                return new ConversionResult { Success = false, Message = "转换失败" };
+
+            var codecName = isH265 ? "H.265" : "H.264";
+            var resInfo = (width.HasValue || height.HasValue) ? $" ({width ?? -1}x{height ?? -1})" : "";
+            return new ConversionResult { Success = true, Message = $"转换成功 ({codecName}{resInfo})" + (useGpu ? "（GPU 加速）" : ""), DestinationPath = destPath };
+        }
+        catch (OperationCanceledException)
+        {
+            if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
+            return new ConversionResult { Success = false, Message = "已取消转换" };
+        }
+        catch (Exception ex)
+        {
+            return new ConversionResult { Success = false, Message = $"转换失败: {ex.Message}" };
+        }
+    }
+
+    public async Task<ConversionResult> RemuxToMp4Async(string sourcePath, CancellationToken cancellationToken = default)
+    {
+        // 已是 .mp4：无需处理
+        if (Path.GetExtension(sourcePath).Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+            return new ConversionResult { Success = true, Message = "已是 mp4", DestinationPath = sourcePath };
+
+        var destPath = Path.Combine(
+            Path.GetDirectoryName(sourcePath)!,
+            Path.GetFileNameWithoutExtension(sourcePath) + ".mp4");
+
+        // 避免与已有同名 mp4 冲突
+        if (File.Exists(destPath))
+        {
+            var name = Path.GetFileNameWithoutExtension(sourcePath);
+            destPath = Path.Combine(Path.GetDirectoryName(sourcePath)!, $"{name}_{Guid.NewGuid():N}"[..(name.Length + 9)] + ".mp4");
+        }
+
+        // 无 ffmpeg：只能直接重命名扩展名（容器可能不匹配，但保证文件可见）
+        if (!File.Exists(_ffmpegPath))
+        {
+            try
+            {
+                File.Move(sourcePath, destPath, true);
+                return new ConversionResult { Success = true, Message = "已重命名为 mp4（未安装 ffmpeg，未转封装）", DestinationPath = destPath };
+            }
+            catch (Exception ex)
+            {
+                return new ConversionResult { Success = false, Message = $"转封装失败: {ex.Message}" };
+            }
+        }
+
+        // 优先 -c copy 快速转封装（不重编码）；失败则回退为音频重编码 aac
+        var result = await RunRemuxAsync(sourcePath, destPath, "-c copy", cancellationToken);
+        if (!result.Success && !cancellationToken.IsCancellationRequested)
+        {
+            if (File.Exists(destPath)) try { File.Delete(destPath); } catch { }
+            result = await RunRemuxAsync(sourcePath, destPath, "-c:v copy -c:a aac", cancellationToken);
+        }
+
+        if (result.Success)
+        {
+            // 转封装成功，删除原始非 mp4 文件
+            try { File.Delete(sourcePath); } catch { }
+        }
+        else if (File.Exists(destPath))
+        {
+            try { File.Delete(destPath); } catch { }
+        }
+
+        return result;
+    }
+
+    private async Task<ConversionResult> RunRemuxAsync(string sourcePath, string destPath, string codecArgs, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = _ffmpegPath,
+                Arguments = $"-i \"{sourcePath}\" -map 0:v:0 -map 0:a? {codecArgs} -movflags +faststart \"{destPath}\" -y",
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data)) _logAggregator.AddLog("ffmpeg", "INFO", e.Data);
+            };
+
+            process.Start();
+            process.BeginErrorReadLine();
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try { process.Kill(true); } catch { }
+            });
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested)
+                return new ConversionResult { Success = false, Message = "已取消" };
+
+            return process.ExitCode == 0
+                ? new ConversionResult { Success = true, Message = "转封装成功", DestinationPath = destPath }
+                : new ConversionResult { Success = false, Message = $"转封装失败 (exit {process.ExitCode})" };
+        }
+        catch (OperationCanceledException)
+        {
+            return new ConversionResult { Success = false, Message = "已取消" };
+        }
+        catch (Exception ex)
+        {
+            return new ConversionResult { Success = false, Message = $"转封装失败: {ex.Message}" };
+        }
+    }
+
     private async Task<ConversionResult> ConvertWithCpuFallbackAsync(string sourcePath, string destPath, string scaleFilter, IProgress<double>? progress, double duration, CancellationToken cancellationToken = default)
     {
         var arguments = $"-i \"{sourcePath}\"{scaleFilter} -c:v libx265 -crf 28 -tag:v hvc1 -c:a copy \"{destPath}\" -y";

@@ -16,6 +16,12 @@ public class DownloadProgress
     public double SpeedBytesPerSecond { get; set; }
     public TimeSpan? Eta { get; set; }
     public string StatusText { get; set; } = string.Empty;
+    /// <summary>已连接的 peer 数（aria2 的 CN 字段）</summary>
+    public int Connections { get; set; }
+    /// <summary>做种节点数（aria2 的 SD 字段）；-1 表示非 BT（HTTP 下载无此值）</summary>
+    public int Seeders { get; set; } = -1;
+    /// <summary>当前正在下载的文件名（aria2 的 FILE 行）</summary>
+    public string? FileName { get; set; }
 }
 
 public class DownloadResult

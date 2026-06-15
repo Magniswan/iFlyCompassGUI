@@ -47,6 +47,18 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
+                    <TextBlock Text="下载队列设置" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="同时进行的最大下载数量" FontSize="12" Opacity="0.6"/>
+                    <NumberBox Value="{Binding MaxConcurrentDownloads, Mode=TwoWay}"
+                               Minimum="1" Maximum="10" SmallChange="1" LargeChange="1"
+                               SpinButtonPlacementMode="Compact" HorizontalAlignment="Left" Width="120"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
                     <TextBlock Text="数据管理" FontSize="16" FontWeight="SemiBold"/>
                     <TextBlock Text="导入或导出 iFlyCompass/instance/ 目录中的数据（小说、视频等）" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                     <StackPanel Orientation="Horizontal" Spacing="12">

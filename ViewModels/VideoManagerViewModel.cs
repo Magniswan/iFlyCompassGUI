@@ -11,10 +11,10 @@ public partial class VideoManagerViewModel : ObservableObject
 {
     private readonly IFileImportService _fileImportService;
     private readonly IDialogService _dialogService;
-    private readonly IDownloadService _downloadService;
+    private readonly IDownloadQueueService _downloadQueueService;
+    private readonly IConfigService _configService;
     private readonly string _videosDir;
     private CancellationTokenSource? _conversionCts;
-    private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty]
     private ObservableCollection<VideoFolder> _folders = new();
@@ -24,6 +24,10 @@ public partial class VideoManagerViewModel : ObservableObject
 
     [ObservableProperty]
     private VideoFolder? _selectedFolder;
+
+    public ObservableCollection<VideoItem> CurrentVideos => SelectedFolder?.Videos ?? RootVideos;
+
+    partial void OnSelectedFolderChanged(VideoFolder? value) => OnPropertyChanged(nameof(CurrentVideos));
 
     [ObservableProperty]
     private string _statusMessage = "";
@@ -35,7 +39,7 @@ public partial class VideoManagerViewModel : ObservableObject
     private bool _isConverting;
 
     [ObservableProperty]
-    private bool _isFolderView = true;
+    private string _conversionStatusText = "";
 
     // 下载相关属性
     [ObservableProperty]
@@ -48,50 +52,93 @@ public partial class VideoManagerViewModel : ObservableObject
     private bool _isBtLink;
 
     [ObservableProperty]
-    private bool _convertAfterDownload;
+    private string _selectedDownloadCodec = "H.265";
 
     [ObservableProperty]
-    private bool _useCustomResolution;
+    private string _selectedDownloadQuality = "原始画质";
+
+    /// <summary>
+    /// 下载任务队列
+    /// </summary>
+    public ObservableCollection<DownloadTaskItem> DownloadTasks => _downloadQueueService.Tasks;
 
     [ObservableProperty]
-    private int _customWidth;
+    private bool _hasActiveDownloads;
+
+    // 下载编码选项
+    public ObservableCollection<string> DownloadCodecOptions { get; } = ["H.265", "H.264"];
+
+    // 下载画质预设
+    public ObservableCollection<string> DownloadQualityPresets { get; } = ["原始画质", "1080p", "720p", "480p", "360p"];
+
+    // 视频列表批量选择
+    [ObservableProperty]
+    private ObservableCollection<VideoItem> _selectedVideos = new();
 
     [ObservableProperty]
-    private int _customHeight;
+    private bool _isTranscodePanelOpen;
 
     [ObservableProperty]
-    private string _selectedPresetResolution = "原始画质";
+    private string _selectedTranscodeCodec = "H.265";
 
     [ObservableProperty]
-    private bool _isDownloading;
+    private string _selectedTranscodeQuality = "原始画质";
 
-    [ObservableProperty]
-    private double _downloadProgress;
+    public ObservableCollection<string> TranscodeCodecOptions { get; } = ["H.265", "H.264"];
+    public ObservableCollection<string> TranscodeQualityPresets { get; } = ["原始画质", "1080p", "720p", "480p", "360p"];
 
-    [ObservableProperty]
-    private string _downloadStatus = "";
-
-    [ObservableProperty]
-    private string _downloadSpeed = "";
-
-    [ObservableProperty]
-    private string _downloadEta = "";
-
-    public ObservableCollection<string> PresetResolutions { get; } = ["原始画质", "自定义"];
-
-    public VideoManagerViewModel(IFileImportService fileImportService, IDialogService dialogService, IDownloadService downloadService)
+    public VideoManagerViewModel(IFileImportService fileImportService, IDialogService dialogService, IDownloadQueueService downloadQueueService, IConfigService configService)
     {
         _fileImportService = fileImportService;
         _dialogService = dialogService;
-        _downloadService = downloadService;
+        _downloadQueueService = downloadQueueService;
+        _configService = configService;
         _videosDir = Path.Combine(PathHelper.DataDirectory, "iFlyCompass", "instance", "videos");
         Directory.CreateDirectory(_videosDir);
+
+        _downloadQueueService.DownloadCompleted += OnDownloadCompleted;
+        _downloadQueueService.BtFileSelectRequired += OnBtFileSelectRequired;
+        _downloadQueueService.Tasks.CollectionChanged += (_, _) => UpdateActiveDownloadsState();
+
         LoadVideos();
     }
 
-    partial void OnSelectedPresetResolutionChanged(string value)
+    private void UpdateActiveDownloadsState()
     {
-        UseCustomResolution = value == "自定义";
+        HasActiveDownloads = _downloadQueueService.Tasks.Any(t =>
+            t.Status == DownloadTaskStatus.Queued || t.Status == DownloadTaskStatus.Downloading);
+    }
+
+    private void OnDownloadCompleted(object? sender, DownloadTaskItem task)
+    {
+        LoadVideos();
+        UpdateActiveDownloadsState();
+    }
+
+    private async void OnBtFileSelectRequired(object? sender, BtFileSelectEventArgs e)
+    {
+        try
+        {
+            var fileNames = e.VideoFiles.Select(f => Path.GetFileName(f)).ToArray();
+            var selectedIndices = await _dialogService.ShowMultiSelectAsync(
+                "选择要导入的视频",
+                $"种子包含 {e.VideoFiles.Count} 个视频文件，请选择要导入的文件：",
+                fileNames);
+
+            if (selectedIndices == null)
+            {
+                e.CompletionSource.SetResult(null);
+            }
+            else
+            {
+                var selectedFiles = selectedIndices.Select(i => e.VideoFiles[i]).ToList();
+                e.CompletionSource.SetResult(selectedFiles);
+            }
+        }
+        catch (Exception ex)
+        {
+            e.CompletionSource.SetException(ex);
+        }
     }
 
     partial void OnDownloadUrlChanged(string value)
@@ -101,10 +148,16 @@ public partial class VideoManagerViewModel : ObservableObject
 
     private void LoadVideos()
     {
+        var selectedPath = SelectedFolder?.Path;
+
         Folders.Clear();
         RootVideos.Clear();
 
-        if (!Directory.Exists(_videosDir)) return;
+        if (!Directory.Exists(_videosDir))
+        {
+            SelectedFolder = null;
+            return;
+        }
 
         foreach (var file in Directory.GetFiles(_videosDir, "*.mp4", SearchOption.TopDirectoryOnly))
         {
@@ -124,10 +177,17 @@ public partial class VideoManagerViewModel : ObservableObject
                 folder.Videos.Add(new VideoItem(fileName, relativePath, folderName));
             }
 
-            if (folder.Videos.Count > 0 || true)
-            {
-                Folders.Add(folder);
-            }
+            Folders.Add(folder);
+        }
+
+        if (selectedPath != null)
+        {
+            SelectedFolder = Folders.FirstOrDefault(f =>
+                string.Equals(f.Path, selectedPath, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            OnPropertyChanged(nameof(CurrentVideos));
         }
     }
 
@@ -460,6 +520,191 @@ public partial class VideoManagerViewModel : ObservableObject
         }
     }
 
+    // 重命名视频
+    [RelayCommand]
+    private async Task RenameVideoAsync(VideoItem? video)
+    {
+        if (video == null) return;
+
+        var currentName = Path.GetFileNameWithoutExtension(video.FileName);
+        var newName = await _dialogService.ShowInputAsync("重命名视频", "请输入新名称:", currentName);
+        if (string.IsNullOrWhiteSpace(newName) || newName == currentName) return;
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (newName.IndexOfAny(invalidChars) >= 0)
+        {
+            await _dialogService.ShowInfoAsync("错误", "名称包含非法字符");
+            return;
+        }
+
+        var ext = Path.GetExtension(video.FileName);
+        var fullPath = Path.Combine(_videosDir, video.RelativePath);
+        var dir = Path.GetDirectoryName(fullPath)!;
+        var newFileName = newName + ext;
+        var newFullPath = Path.Combine(dir, newFileName);
+
+        if (File.Exists(newFullPath))
+        {
+            await _dialogService.ShowInfoAsync("错误", "该名称已被使用");
+            return;
+        }
+
+        try
+        {
+            File.Move(fullPath, newFullPath);
+            var oldFolderName = video.FolderName;
+            video.FileName = newFileName;
+            video.RelativePath = oldFolderName != null
+                ? Path.Combine(oldFolderName, newFileName)
+                : newFileName;
+            StatusMessage = $"已重命名为: {newFileName}";
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowInfoAsync("错误", $"重命名失败: {ex.Message}");
+        }
+    }
+
+    // 批量删除
+    [RelayCommand]
+    private async Task DeleteSelectedVideosAsync()
+    {
+        if (SelectedVideos.Count == 0) return;
+
+        var confirm = await _dialogService.ShowConfirmAsync("确认删除",
+            $"确定要删除选中的 {SelectedVideos.Count} 个视频吗？此操作不可撤销。");
+        if (!confirm) return;
+
+        var deleted = 0;
+        foreach (var video in SelectedVideos.ToList())
+        {
+            var fullPath = Path.Combine(_videosDir, video.RelativePath);
+            try
+            {
+                if (File.Exists(fullPath))
+                {
+                    File.Delete(fullPath);
+                    if (video.FolderName == null)
+                        RootVideos.Remove(video);
+                    else
+                    {
+                        var folder = Folders.FirstOrDefault(f => f.Name == video.FolderName);
+                        folder?.Videos.Remove(video);
+                    }
+                    deleted++;
+                }
+            }
+            catch { }
+        }
+
+        SelectedVideos.Clear();
+        StatusMessage = $"已删除 {deleted} 个视频";
+    }
+
+    // 转码面板
+    [RelayCommand]
+    private void ToggleTranscodePanel()
+    {
+        IsTranscodePanelOpen = !IsTranscodePanelOpen;
+    }
+
+    [RelayCommand]
+    private async Task TranscodeSelectedVideosAsync()
+    {
+        if (SelectedVideos.Count == 0)
+        {
+            await _dialogService.ShowInfoAsync("提示", "请先选择要转码的视频");
+            return;
+        }
+
+        var codec = SelectedTranscodeCodec.Equals("H.264", StringComparison.OrdinalIgnoreCase) ? "h264" : "h265";
+        var (width, height) = ParseQualityPreset(SelectedTranscodeQuality);
+
+        _conversionCts?.Cancel();
+        _conversionCts = new CancellationTokenSource();
+        IsConverting = true;
+        ConversionProgress = 0;
+
+        var total = SelectedVideos.Count;
+        var processed = 0;
+
+        try
+        {
+            foreach (var video in SelectedVideos.ToList())
+            {
+                if (_conversionCts.Token.IsCancellationRequested) break;
+
+                var sourcePath = Path.Combine(_videosDir, video.RelativePath);
+                if (!File.Exists(sourcePath)) continue;
+
+                ConversionStatusText = $"正在转码 ({processed + 1}/{total}): {video.FileName}";
+
+                var destPath = Path.Combine(
+                    Path.GetDirectoryName(sourcePath)!,
+                    Path.GetFileNameWithoutExtension(sourcePath) + $"_transcoded.mp4");
+
+                // 处理文件名冲突
+                if (File.Exists(destPath))
+                {
+                    destPath = Path.Combine(
+                        Path.GetDirectoryName(sourcePath)!,
+                        $"{Path.GetFileNameWithoutExtension(sourcePath)}_{Guid.NewGuid():N[..8]}_transcoded.mp4");
+                }
+
+                var fileProgress = new Progress<double>(p =>
+                {
+                    var overallProgress = (processed + p) / total * 100;
+                    ConversionProgress = overallProgress;
+                });
+
+                var result = await _fileImportService.ConvertVideoAsync(
+                    sourcePath, destPath, codec, width, height, fileProgress, _conversionCts.Token);
+
+                if (result.Success && File.Exists(destPath))
+                {
+                    // 用转码后的文件替换原文件
+                    try { File.Delete(sourcePath); } catch { }
+                    File.Move(destPath, sourcePath);
+
+                    // 更新文件名（可能扩展名变化）
+                    var newFileName = Path.GetFileName(sourcePath);
+                    video.FileName = newFileName;
+                    video.RelativePath = video.FolderName != null
+                        ? Path.Combine(video.FolderName, newFileName)
+                        : newFileName;
+                }
+
+                processed++;
+            }
+
+            StatusMessage = _conversionCts.Token.IsCancellationRequested
+                ? $"已取消转码（完成 {processed}/{total}）"
+                : $"转码完成 ({processed}/{total})";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "已取消转码";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"转码失败: {ex.Message}";
+        }
+        finally
+        {
+            IsConverting = false;
+            ConversionStatusText = "";
+            _conversionCts = null;
+            SelectedVideos.Clear();
+            LoadVideos();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelTranscode()
+    {
+        _conversionCts?.Cancel();
+    }
+
     // 下载相关命令
     [RelayCommand]
     private void ToggleDownloadPanel()
@@ -486,211 +731,60 @@ public partial class VideoManagerViewModel : ObservableObject
         }
 
         var targetDir = SelectedFolder?.Path ?? _videosDir;
+        var codec = SelectedDownloadCodec.Equals("H.264", StringComparison.OrdinalIgnoreCase) ? "h264" : "h265";
+        var (width, height) = ParseQualityPreset(SelectedDownloadQuality);
+        var needsConvert = !SelectedDownloadQuality.Equals("原始画质") || !codec.Equals("h265", StringComparison.OrdinalIgnoreCase);
 
-        _downloadCts?.Cancel();
-        _downloadCts = new CancellationTokenSource();
-        IsDownloading = true;
-        DownloadProgress = 0;
-        DownloadStatus = "正在准备下载...";
-        DownloadSpeed = "";
-        DownloadEta = "";
+        _downloadQueueService.Enqueue(url, IsBtLink, needsConvert, targetDir, codec, width, height);
 
-        try
-        {
-            var progress = new Progress<DownloadProgress>(p =>
-            {
-                DownloadProgress = p.Progress;
-                DownloadStatus = p.StatusText;
-                DownloadSpeed = p.SpeedBytesPerSecond > 0 ? FormatSpeed(p.SpeedBytesPerSecond) : "";
-                DownloadEta = p.Eta.HasValue ? $"剩余 {FormatEta(p.Eta.Value)}" : "";
-            });
+        DownloadUrl = "";
+        StatusMessage = "已加入下载队列";
 
-            DownloadResult result;
-            if (IsBtLink)
-            {
-                result = await _downloadService.DownloadBtAsync(url, targetDir, progress, _downloadCts.Token);
-            }
-            else
-            {
-                result = await _downloadService.DownloadHttpAsync(url, targetDir, progress, _downloadCts.Token);
-            }
-
-            if (!result.Success)
-            {
-                DownloadStatus = result.Message;
-                StatusMessage = result.Message;
-                return;
-            }
-
-            // 下载成功：清空下载面板状态，自动关闭
-            DownloadStatus = "";
-            DownloadSpeed = "";
-            DownloadEta = "";
-            DownloadProgress = 0;
-            DownloadUrl = "";
-            IsDownloadPanelOpen = false;
-
-            // BT 下载：从临时目录筛选视频文件，让用户选择，导入后清理临时目录
-            if (IsBtLink && result.DownloadedFilePaths.Count > 0)
-            {
-                var videoFiles = result.DownloadedFilePaths;
-                List<string> selectedFiles;
-
-                if (videoFiles.Count == 1)
-                {
-                    selectedFiles = videoFiles;
-                }
-                else
-                {
-                    // 多个视频文件，让用户选择
-                    var fileNames = videoFiles.Select(f => Path.GetFileName(f)).ToArray();
-                    var selectedIndices = await _dialogService.ShowMultiSelectAsync(
-                        "选择要导入的视频",
-                        $"种子包含 {videoFiles.Count} 个视频文件，请选择要导入的文件：",
-                        fileNames);
-
-                    if (selectedIndices == null)
-                    {
-                        // 用户取消选择
-                        StatusMessage = "已取消导入";
-                        CleanupTempDirectory(result.TempDirectory);
-                        return;
-                    }
-
-                    selectedFiles = selectedIndices.Select(i => videoFiles[i]).ToList();
-                }
-
-                // 导入选中的视频文件到目标目录
-                var imported = 0;
-                foreach (var sourcePath in selectedFiles)
-                {
-                    StatusMessage = $"正在导入 {imported + 1}/{selectedFiles.Count}...";
-                    var destPath = Path.Combine(targetDir, Path.GetFileName(sourcePath));
-
-                    // 处理文件名冲突
-                    if (File.Exists(destPath))
-                    {
-                        var nameWithoutExt = Path.GetFileNameWithoutExtension(sourcePath);
-                        var ext = Path.GetExtension(sourcePath);
-                        destPath = Path.Combine(targetDir, $"{nameWithoutExt}_{Guid.NewGuid():N[..8]}{ext}");
-                    }
-
-                    File.Copy(sourcePath, destPath, true);
-
-                    // 下载后处理：转编码和/或分辨率
-                    if (ConvertAfterDownload || (UseCustomResolution && (CustomWidth > 0 || CustomHeight > 0)))
-                    {
-                        await ProcessDownloadedVideoAsync(destPath);
-                    }
-
-                    imported++;
-                }
-
-                // 清理临时目录
-                CleanupTempDirectory(result.TempDirectory);
-                LoadVideos();
-                StatusMessage = $"成功导入 {imported} 个视频";
-                return;
-            }
-
-            // HTTP 下载：原有逻辑
-            StatusMessage = "下载完成";
-
-            if (result.DownloadedFilePath != null && File.Exists(result.DownloadedFilePath))
-            {
-                var needsProcessing = ConvertAfterDownload || (UseCustomResolution && (CustomWidth > 0 || CustomHeight > 0));
-
-                if (needsProcessing)
-                {
-                    await ProcessDownloadedVideoAsync(result.DownloadedFilePath);
-                }
-            }
-
-            LoadVideos();
-        }
-        catch (OperationCanceledException)
-        {
-            DownloadStatus = "下载已取消";
-            StatusMessage = "下载已取消";
-        }
-        catch (Exception ex)
-        {
-            DownloadStatus = $"下载失败: {ex.Message}";
-            StatusMessage = $"下载失败: {ex.Message}";
-        }
-        finally
-        {
-            IsDownloading = false;
-            _downloadCts = null;
-        }
-    }
-
-    private async Task ProcessDownloadedVideoAsync(string sourcePath)
-    {
-        var destPath = Path.Combine(
-            Path.GetDirectoryName(sourcePath)!,
-            Path.GetFileNameWithoutExtension(sourcePath) + "_converted.mp4");
-
-        int? width = UseCustomResolution && CustomWidth > 0 ? CustomWidth : null;
-        int? height = UseCustomResolution && CustomHeight > 0 ? CustomHeight : null;
-
-        _conversionCts = new CancellationTokenSource();
-        IsConverting = true;
-        ConversionProgress = 0;
-
-        var convProgress = new Progress<double>(p => ConversionProgress = p * 100);
-
-        try
-        {
-            var convResult = await _fileImportService.ConvertVideoWithResolutionAsync(
-                sourcePath, destPath, width, height, convProgress, _conversionCts.Token);
-
-            if (convResult.Success)
-            {
-                try { File.Delete(sourcePath); } catch { }
-                StatusMessage = convResult.Message;
-            }
-            else
-            {
-                StatusMessage = $"下载完成但转换失败: {convResult.Message}";
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            StatusMessage = "下载完成，转换已取消";
-        }
-        finally
-        {
-            IsConverting = false;
-            _conversionCts = null;
-        }
-    }
-
-    private static void CleanupTempDirectory(string? tempDir)
-    {
-        if (string.IsNullOrEmpty(tempDir) || !Directory.Exists(tempDir)) return;
-        try { Directory.Delete(tempDir, true); } catch { }
+        UpdateActiveDownloadsState();
     }
 
     [RelayCommand]
-    private void CancelDownload()
+    private void CancelDownloadTask(DownloadTaskItem? task)
     {
-        _downloadCts?.Cancel();
+        if (task == null) return;
+        _downloadQueueService.CancelTask(task.Id);
+        UpdateActiveDownloadsState();
     }
 
-    private static string FormatSpeed(double bytesPerSecond)
+    [RelayCommand]
+    private void RemoveDownloadTask(DownloadTaskItem? task)
     {
-        string[] units = ["B/s", "KB/s", "MB/s", "GB/s"];
-        var speed = bytesPerSecond;
-        var i = 0;
-        while (speed >= 1024 && i < units.Length - 1) { speed /= 1024; i++; }
-        return $"{speed:0.##} {units[i]}";
+        if (task == null) return;
+        _downloadQueueService.RemoveTask(task.Id);
+        UpdateActiveDownloadsState();
     }
 
-    private static string FormatEta(TimeSpan eta)
+    [RelayCommand]
+    private void ClearCompletedDownloads()
     {
-        if (eta.TotalHours >= 1) return $"{(int)eta.TotalHours}h{eta.Minutes}m";
-        if (eta.TotalMinutes >= 1) return $"{eta.Minutes}m{eta.Seconds}s";
-        return $"{eta.Seconds}s";
+        _downloadQueueService.ClearCompleted();
+        UpdateActiveDownloadsState();
+    }
+
+    [RelayCommand]
+    private void CancelAllDownloads()
+    {
+        _downloadQueueService.CancelAll();
+        UpdateActiveDownloadsState();
+    }
+
+    /// <summary>
+    /// 解析画质预设为宽高
+    /// </summary>
+    private static (int? width, int? height) ParseQualityPreset(string preset)
+    {
+        return preset switch
+        {
+            "1080p" => (null, 1080),
+            "720p" => (null, 720),
+            "480p" => (null, 480),
+            "360p" => (null, 360),
+            _ => (null, null) // 原始画质
+        };
     }
 }
