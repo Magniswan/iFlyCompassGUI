@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Services;
+using Microsoft.UI.Xaml;
 
 namespace iFlyCompassGUI.ViewModels;
 
@@ -13,12 +14,14 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IDialogService _dialogService;
     private readonly IDataService _dataService;
     private readonly IDownloadQueueService _downloadQueueService;
-
-    [ObservableProperty]
-    private bool _autoStartApp;
+    private readonly IStartupService _startupService;
 
     [ObservableProperty]
     private bool _rememberWindowState;
+
+    /// <summary>关闭主窗口时是否在后台运行 (隐藏窗口、不显示任务栏)。</summary>
+    [ObservableProperty]
+    private bool _runInBackgroundWhenClosed;
 
     [ObservableProperty]
     private string _gitHubRepoUrl = "https://github.com/MoyuZJ912/iFlyCompass";
@@ -41,10 +44,22 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _maxConcurrentDownloads = 3;
 
+    /// <summary>开机自启开关当前状态 (由 StartupService 决定，非纯本地字段)。</summary>
+    [ObservableProperty]
+    private bool _isAutoStartEnabled;
+
+    /// <summary>开机自启状态描述文案 (供 UI 副标题展示，例如「已被系统禁用」)。</summary>
+    [ObservableProperty]
+    private string _autoStartStatusText = "";
+
+    /// <summary>切换开机自启时是否正在进行异步操作 (禁用按钮防止重复点击)。</summary>
+    [ObservableProperty]
+    private bool _isTogglingAutoStart;
+
     public event EventHandler? RequestNavigateWelcome;
     public event EventHandler? InstanceDataChanged;
 
-    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService, IDownloadQueueService downloadQueueService)
+    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService, IDownloadQueueService downloadQueueService, IStartupService startupService)
     {
         _configService = configService;
         _processService = processService;
@@ -52,21 +67,69 @@ public partial class SettingsViewModel : ObservableObject
         _dialogService = dialogService;
         _dataService = dataService;
         _downloadQueueService = downloadQueueService;
+        _startupService = startupService;
         LoadSettings();
+        RefreshAutoStartState();
     }
 
     private void LoadSettings()
     {
-        AutoStartApp = _configService.Settings.AutoStartApp;
         RememberWindowState = !string.IsNullOrEmpty(_configService.Settings.LastSelectedPage);
         GitHubRepoUrl = _configService.Settings.GitHubRepoUrl;
         MaxConcurrentDownloads = _configService.Settings.MaxConcurrentDownloads;
+        RunInBackgroundWhenClosed = _configService.Settings.RunInBackgroundWhenClosed;
     }
 
-    partial void OnAutoStartAppChanged(bool value)
+    /// <summary>从 StartupService 同步当前开机自启状态到 UI 字段。</summary>
+    private void RefreshAutoStartState()
     {
-        _configService.Settings.AutoStartApp = value;
-        _ = _configService.SaveAsync();
+        var state = _startupService.Refresh();
+        IsAutoStartEnabled = state is StartupTaskState.Enabled or StartupTaskState.EnabledByPolicy;
+        AutoStartStatusText = state switch
+        {
+            StartupTaskState.Enabled => "已启用，开机时将静默运行 (无窗口、无托盘)",
+            StartupTaskState.EnabledByPolicy => "已由策略启用，开机时将静默运行",
+            StartupTaskState.Disabled => "未启用",
+            StartupTaskState.DisabledByUser => "已被系统禁用，请在「设置 → 应用 → 启动」中重新允许",
+            _ => "状态未知"
+        };
+    }
+
+    /// <summary>
+    /// 切换开机自启。
+    /// <paramref name="enable"/> 取自开关切换后的新值 (用户手势语义)：true=启用，false=禁用。
+    /// 注意不能用 IsAutoStartEnabled 当前值判断方向——OneWay 绑定下它代表系统真实状态，
+    /// 而非用户意图。最终是否生效由系统决定，RefreshAutoStartState 会回写真实状态。
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleAutoStartAsync(object? parameter)
+    {
+        if (IsTogglingAutoStart) return;
+
+        // CommandParameter 传的是开关 IsOn 新值；为兼容无参调用，缺省时按当前相反状态处理。
+        var enable = parameter is bool b ? b : !IsAutoStartEnabled;
+
+        IsTogglingAutoStart = true;
+        try
+        {
+            if (enable)
+            {
+                var result = await _startupService.EnableAsync();
+                if (result == StartupTaskState.DisabledByUser)
+                {
+                    await _dialogService.ShowInfoAsync("无法启用", "开机自启已被系统禁用，请在 Windows「设置 → 应用 → 启动」中重新允许 iFlyCompassGUI。");
+                }
+            }
+            else
+            {
+                await _startupService.DisableAsync();
+            }
+        }
+        finally
+        {
+            RefreshAutoStartState();
+            IsTogglingAutoStart = false;
+        }
     }
 
     partial void OnRememberWindowStateChanged(bool value)
@@ -79,6 +142,12 @@ public partial class SettingsViewModel : ObservableObject
         {
             _configService.Settings.LastSelectedPage = "";
         }
+        _ = _configService.SaveAsync();
+    }
+
+    partial void OnRunInBackgroundWhenClosedChanged(bool value)
+    {
+        _configService.Settings.RunInBackgroundWhenClosed = value;
         _ = _configService.SaveAsync();
     }
 
@@ -97,13 +166,29 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ResetSettings()
+    private async Task ResetSettings()
     {
-        _configService.Settings.AutoStartApp = false;
         _configService.Settings.LastSelectedPage = "";
         _configService.Settings.GitHubRepoUrl = "https://github.com/MoyuZJ912/iFlyCompass";
-        _ = _configService.SaveAsync();
+        _configService.Settings.RunInBackgroundWhenClosed = false;
+        await _configService.SaveAsync();
+
+        // 同时关闭开机自启，恢复出厂状态。
+        await _startupService.DisableAsync();
+        RefreshAutoStartState();
+
         LoadSettings();
+    }
+
+    /// <summary>
+    /// 真正退出整个 GUI 进程。
+    /// 用于「关闭窗口后台运行」启用时提供退出入口；app.py 作为独立子进程由 ProcessService 管理，
+    /// 其生命周期不受此调用影响 (后台继续运行)。
+    /// </summary>
+    [RelayCommand]
+    private void ExitApp()
+    {
+        Application.Current.Exit();
     }
 
     [RelayCommand]
@@ -126,9 +211,13 @@ public partial class SettingsViewModel : ObservableObject
                 await _dialogService.ShowInfoAsync("卸载完成", result.Message);
                 _configService.Settings.InstalledVersion = "";
                 _configService.Settings.IsInstalled = false;
-                _configService.Settings.AutoStartApp = false;
                 _configService.Settings.LastSelectedPage = "";
                 await _configService.SaveAsync();
+
+                // 卸载时关闭开机自启，避免下次登录时静默启动一个已卸载的应用。
+                await _startupService.DisableAsync();
+                RefreshAutoStartState();
+
                 RequestNavigateWelcome?.Invoke(this, EventArgs.Empty);
             }
             else

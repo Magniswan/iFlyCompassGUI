@@ -11,7 +11,11 @@ public partial class App : Application
     public IServiceProvider Services { get; private set; } = null!;
     public Window? MainWindowInstance { get; private set; }
 
-
+    /// <summary>
+    /// 是否以静默模式启动 (由 Program.cs 根据开机自启激活判定)。
+    /// 静默模式下不显示窗口、不显示托盘，仅在后台运行 app.py。
+    /// </summary>
+    public static bool IsSilentStartup { get; set; }
 
     public App()
     {
@@ -23,38 +27,74 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         MainWindowInstance = new MainWindow();
-        MainWindowInstance.Activate();
 
-        _ = AutoStartIfNeededAsync();
+        if (IsSilentStartup)
+        {
+            // 静默启动: 隐藏窗口 (无窗口、无托盘)，后台拉起 app.py。
+            if (MainWindowInstance is MainWindow mainWindow)
+            {
+                mainWindow.HideWindow();
+            }
+            _ = SilentStartAsync();
+        }
+        else
+        {
+            MainWindowInstance.Activate();
+            _ = AttachAndAutoStartAsync();
+        }
     }
 
-    private async Task AutoStartIfNeededAsync()
+    /// <summary>
+    /// 静默启动: 不显示任何窗口，后台运行 app.py。用户再次手动启动时会通过单实例唤出窗口。
+    /// </summary>
+    private async Task SilentStartAsync()
     {
         try
         {
             var configService = Services.GetRequiredService<IConfigService>();
             await configService.LoadAsync();
-            
-            var processService = Services.GetRequiredService<IProcessService>();
-            
-            if (processService.TryAttachToExistingProcess())
+
+            if (configService.Settings.IsInstalled)
             {
-                return;
-            }
-            
-            if (configService.Settings.AutoStartApp)
-            {
-                if (configService.Settings.IsInstalled)
+                var processService = Services.GetRequiredService<IProcessService>();
+                if (!processService.IsRunning)
                 {
-                    if (!processService.IsRunning)
-                    {
-                        await processService.StartAsync();
-                    }
+                    await processService.StartAsync();
                 }
             }
         }
         catch
         {
+        }
+    }
+
+    /// <summary>
+    /// 普通启动 (用户手动打开): 仅尝试附加到已运行的 app.py 进程，不主动拉起。
+    /// 是否运行 app.py 由用户在主页手动控制，保持原有行为。
+    /// </summary>
+    private async Task AttachAndAutoStartAsync()
+    {
+        try
+        {
+            var configService = Services.GetRequiredService<IConfigService>();
+            await configService.LoadAsync();
+
+            var processService = Services.GetRequiredService<IProcessService>();
+            processService.TryAttachToExistingProcess();
+        }
+        catch
+        {
+        }
+    }
+
+    /// <summary>
+    /// 单实例重定向回调中调用: 唤出已被静默隐藏的主窗口并置于前台。
+    /// </summary>
+    public static void ShowMainWindow()
+    {
+        if (App.Current is App app && app.MainWindowInstance is MainWindow window)
+        {
+            window.ShowWindow();
         }
     }
     
@@ -74,6 +114,7 @@ public partial class App : Application
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IConfigService, ConfigService>();
         services.AddSingleton<IProcessService, ProcessService>();
+        services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IInstallService, InstallService>();
         services.AddSingleton<IUserDbService, UserDbService>();
         services.AddSingleton<IUpdateService, UpdateService>();

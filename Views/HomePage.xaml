@@ -33,9 +33,10 @@
                         </StackPanel>
                     </StackPanel>
                     
-                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4">
+                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4"
+                                Visibility="{Binding AccessAddress, Converter={StaticResource StringToVisibilityConverter}}">
                         <TextBlock Text="访问地址" Opacity="0.6" FontSize="12"/>
-                        <HyperlinkButton Content="http://127.0.0.1:5002" 
+                        <HyperlinkButton Content="{Binding AccessAddress}" 
                                          Command="{Binding OpenBrowserCommand}" Padding="0"/>
                     </StackPanel>
                     

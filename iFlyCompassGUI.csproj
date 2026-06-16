@@ -11,6 +11,10 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- 自定义 Program.cs：承载单实例 (AppInstance) 与开机启动检测逻辑 -->
+    <DisableXamlGeneratedMain>true</DisableXamlGeneratedMain>
+    <!-- 显式定义编译常量，关闭 XAML 编译器自动生成的 Program.Main -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <Platforms>x64</Platforms>
     <Platform Condition=" '$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' ">x64</Platform>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
@@ -51,7 +55,6 @@
     <Content Include="tools\**\*" CopyToOutputDirectory="PreserveNewest" Link="tools\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <!-- Import certificate password from local file (gitignored) -->
-  <Import Project="cert\cert-password.props" Condition="Exists('cert\cert-password.props')" />
+
 
 </Project>

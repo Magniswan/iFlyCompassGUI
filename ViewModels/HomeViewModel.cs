@@ -23,6 +23,13 @@ public partial class HomeViewModel : ObservableObject
     
     [ObservableProperty]
     private string _uptimeText = "00:00:00";
+
+    /// <summary>
+    /// 访问地址 (host:port)。未启动或尚未解析到 Python 日志输出时为空字符串，
+    /// 主页据此隐藏"访问地址"一行。
+    /// </summary>
+    [ObservableProperty]
+    private string _accessAddress = "";
     
     [ObservableProperty]
     private bool _isToggling;
@@ -43,9 +50,19 @@ public partial class HomeViewModel : ObservableObject
         _dispatcherHelper = dispatcherHelper;
         _processService.RunningStateChanged += OnRunningStateChanged;
         _processService.LogOutputReceived += OnLogOutputReceived;
+        _processService.AccessAddressChanged += OnAccessAddressChanged;
         IsRunning = _processService.IsRunning;
         StatusText = IsRunning ? "运行中" : "已停止";
+        AccessAddress = _processService.AccessAddress ?? "";
         DetectVersion();
+
+        // 启动场景: GUI 是在 app.py 已运行之后才打开 (典型: 开机自启先后台拉起 app.py，
+        // 用户手动启动 GUI 时附加到该进程)。此时不会触发 RunningStateChanged(true)，
+        // 故在此用 ProcessService 已记录的真实启动时间初始化运行时长计时器。
+        if (IsRunning && _processService.ProcessStartTime.HasValue)
+        {
+            StartUptimeTimer(_processService.ProcessStartTime.Value);
+        }
     }
     
     private void DetectVersion()
@@ -85,23 +102,47 @@ public partial class HomeViewModel : ObservableObject
         {
             ShowCrashWarning = false;
             CrashMessage = "";
-            _startTime = DateTime.Now;
-            _uptimeTimer = new System.Timers.Timer(1000);
-            _uptimeTimer.Elapsed += (s, e) =>
-            {
-                var uptime = DateTime.Now - _startTime;
-                var text = $"{(int)uptime.TotalHours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
-                _dispatcherHelper.RunOnUIThread(() => UptimeText = text);
-            };
-            _uptimeTimer.Start();
+            // 优先采用 ProcessService 记录的真实启动时间 (本进程启动时为 DateTime.Now，
+            // 附加到已运行进程时为该进程的 StartTime)，避免运行时长从错误基准计算。
+            var start = _processService.ProcessStartTime ?? DateTime.Now;
+            StartUptimeTimer(start);
         }
         else
         {
-            _uptimeTimer?.Stop();
-            _uptimeTimer?.Dispose();
-            _uptimeTimer = null;
-            UptimeText = "00:00:00";
+            StopUptimeTimer();
         }
+    }
+
+    /// <summary>启动 1 秒一次的运行时长计时器，基准为 <paramref name="startTime"/>。</summary>
+    private void StartUptimeTimer(DateTime startTime)
+    {
+        StopUptimeTimer();
+        _startTime = startTime;
+        // 立即刷新一次，避免首秒显示 00:00:00。
+        UpdateUptime();
+        _uptimeTimer = new System.Timers.Timer(1000);
+        _uptimeTimer.Elapsed += (s, e) => _dispatcherHelper.RunOnUIThread(UpdateUptime);
+        _uptimeTimer.Start();
+    }
+
+    private void StopUptimeTimer()
+    {
+        _uptimeTimer?.Stop();
+        _uptimeTimer?.Dispose();
+        _uptimeTimer = null;
+        UptimeText = "00:00:00";
+    }
+
+    private void UpdateUptime()
+    {
+        var uptime = DateTime.Now - _startTime;
+        if (uptime < TimeSpan.Zero) uptime = TimeSpan.Zero;
+        UptimeText = $"{(int)uptime.TotalHours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
+    }
+
+    private void OnAccessAddressChanged(object? sender, string address)
+    {
+        _dispatcherHelper.RunOnUIThread(() => AccessAddress = address ?? "");
     }
 
     private void OnLogOutputReceived(object? sender, string logLine)
@@ -160,6 +201,8 @@ public partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private void OpenBrowser()
     {
-        Process.Start(new ProcessStartInfo("http://127.0.0.1:5002") { UseShellExecute = true });
+        // 优先使用 Python 日志解析出的实际访问地址；尚未解析到时回退到本地回环地址。
+        var host = !string.IsNullOrWhiteSpace(AccessAddress) ? AccessAddress : "127.0.0.1:5002";
+        Process.Start(new ProcessStartInfo($"http://{host}") { UseShellExecute = true });
     }
 }

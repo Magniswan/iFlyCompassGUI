@@ -115,6 +115,21 @@ public sealed partial class MainWindow : Window
         _configService.Settings.WindowWidth = size.Width;
         _configService.Settings.WindowHeight = size.Height;
         _ = _configService.SaveAsync();
+
+        // 启用「关闭窗口后台运行」时：拦截关闭，仅隐藏窗口 (不显示任务栏图标)，进程继续运行。
+        // 用户可再次启动程序 (经单实例重定向) 唤回窗口，或在设置页点击「退出」真正结束进程。
+        if (_configService.Settings.RunInBackgroundWhenClosed)
+        {
+            args.Handled = true;
+            try
+            {
+                this.AppWindow.Hide();
+            }
+            catch
+            {
+                // AppWindow 尚未就绪时忽略。
+            }
+        }
     }
     
     public void NavigateToHome()
@@ -123,6 +138,74 @@ public sealed partial class MainWindow : Window
         _viewModel.IsInstalled = true;
         _configService.Settings.IsInstalled = true;
         _ = _configService.SaveAsync();
+    }
+
+    /// <summary>
+    /// 隐藏主窗口 (用于开机静默启动: 无窗口、无托盘)。
+    /// 注意: 静默启动时尚未 Activate，此时直接调用 Hide 即可; 已激活窗口亦适用。
+    /// </summary>
+    public void HideWindow()
+    {
+        try
+        {
+            this.AppWindow.Hide();
+        }
+        catch
+        {
+            // AppWindow 尚未就绪时忽略。
+        }
+    }
+
+    /// <summary>
+    /// 显示并前置主窗口 (由单实例重定向触发，将被静默隐藏的窗口唤回前台)。
+    /// </summary>
+    public void ShowWindow()
+    {
+        _dispatcherHelper.RunOnUIThread(() =>
+        {
+            try
+            {
+                this.AppWindow.Show();
+                // 先恢复再前置，确保从最小化/隐藏状态还原并获得焦点。
+                if (this.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+                {
+                    if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
+                    {
+                        presenter.Restore();
+                    }
+                }
+
+                TrySetForeground(this);
+            }
+            catch
+            {
+            }
+        });
+    }
+
+    /// <summary>通过 Win32 SetForegroundWindow 把窗口真正置前 (AppWindow.Show 不保证获得焦点)。</summary>
+    private static void TrySetForeground(Window window)
+    {
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            _ = PInvoke.SetForegroundWindow(hwnd);
+            _ = PInvoke.ShowWindow(hwnd, PInvoke.SW_RESTORE);
+        }
+        catch
+        {
+        }
+    }
+
+    private static class PInvoke
+    {
+        public const int SW_RESTORE = 9;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }
 
     public void NavigateToWelcome()

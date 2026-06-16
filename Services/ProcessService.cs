@@ -17,8 +17,24 @@ public class ProcessService : IProcessService, IDisposable
     private readonly CancellationTokenSource _cts = new();
 
     public bool IsRunning { get; private set; }
+    
+    /// <summary>
+    /// Python 进程的实际启动时间。本进程主动启动时记录 <see cref="DateTime.Now"/>；
+    /// 附加到已运行进程 (开机自启后唤出 GUI) 时尝试通过 <see cref="Process.StartTime"/> 读取。
+    /// </summary>
+    public DateTime? ProcessStartTime { get; private set; }
+
+    /// <summary>
+    /// 从 Python "Running on http://host:port" 日志行解析出的访问地址 (host:port)。
+    /// 优先采用非环回 IPv4 地址 (局域网地址)；未捕获到日志时回退为 null。
+    /// </summary>
+    public string? AccessAddress { get; private set; }
+
     public event EventHandler<bool>? RunningStateChanged;
     public event EventHandler<string>? LogOutputReceived;
+
+    /// <summary>当从 Python 日志解析到新的访问地址时触发。</summary>
+    public event EventHandler<string>? AccessAddressChanged;
 
     public ProcessService(DispatcherHelper dispatcherHelper, ILogAggregatorService logAggregator)
     {
@@ -89,6 +105,10 @@ public class ProcessService : IProcessService, IDisposable
             _ = ReadOutputAsync(_process.StandardError, "ERROR");
             
             IsRunning = true;
+            // 记录实际启动时间，供主页计算运行时长 (含开机自启后唤出 GUI 的场景)。
+            ProcessStartTime = DateTime.Now;
+            // 新进程启动: 清空上一次的访问地址，等待 Python 日志输出新的 "Running on" 行。
+            AccessAddress = null;
             _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, true));
         }
         catch (Exception ex)
@@ -139,8 +159,10 @@ public class ProcessService : IProcessService, IDisposable
         if (_process == null || _process.HasExited)
         {
             IsRunning = false;
-            _process = null;
+            ProcessStartTime = null;
+            AccessAddress = null;
             _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
+            _process = null;
             return;
         }
         
@@ -159,6 +181,8 @@ public class ProcessService : IProcessService, IDisposable
         catch { }
         
         IsRunning = false;
+        ProcessStartTime = null;
+        AccessAddress = null;
         _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
         _process = null;
     }
@@ -179,6 +203,8 @@ public class ProcessService : IProcessService, IDisposable
                 var line = await reader.ReadLineAsync(_cts.Token);
                 if (line == null) break;
 
+                TryParseAccessAddress(line);
+
                 var formatted = $"[{DateTime.Now:HH:mm:ss}] [{level}] {line}";
                 _dispatcherHelper.RunOnUIThread(() => LogOutputReceived?.Invoke(this, formatted));
                 _logAggregator.AddLog("Python", level, line);
@@ -187,6 +213,40 @@ public class ProcessService : IProcessService, IDisposable
         catch (OperationCanceledException) { }
         catch { }
     }
+
+    /// <summary>
+    /// 解析 Werkzeug/socketio 的 "Running on http://host:port" 日志行。
+    /// 优先记录非环回 IPv4 地址；若仅有 0.0.0.0/127.0.0.1 则在已记录到局域网地址前作为占位。
+    /// </summary>
+    private void TryParseAccessAddress(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+        if (!line.Contains("Running on", StringComparison.OrdinalIgnoreCase)) return;
+
+        // 形如 " * Running on http://192.168.40.104:5002"
+        var match = Regex.Match(line, @"https?://(\d{1,3}(?:\.\d{1,3}){3}):(\d+)");
+        if (!match.Success) return;
+
+        var host = match.Groups[1].Value;
+        var port = match.Groups[2].Value;
+        var address = $"{host}:{port}";
+
+        // 优先采用局域网/公网 IPv4，避免一直停留在 0.0.0.0 或 127.0.0.1。
+        if (host is "0.0.0.0" or "127.0.0.1")
+        {
+            // 仅在尚未记录到任何可用地址时，才接受环回/通配地址作为占位。
+            if (!string.IsNullOrEmpty(AccessAddress) &&
+                !AccessAddress!.StartsWith("0.0.0.0") &&
+                !AccessAddress.StartsWith("127.0.0.1"))
+            {
+                return;
+            }
+        }
+
+        if (AccessAddress == address) return;
+        AccessAddress = address;
+        _dispatcherHelper.RunOnUIThread(() => AccessAddressChanged?.Invoke(this, address));
+    }
     
     private void OnProcessExited(object? sender, EventArgs e)
     {
@@ -194,6 +254,8 @@ public class ProcessService : IProcessService, IDisposable
         if (exitedProcess == null || exitedProcess != _process) return;
         
         IsRunning = false;
+        ProcessStartTime = null;
+        AccessAddress = null;
         _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
         
         try
@@ -250,6 +312,16 @@ public class ProcessService : IProcessService, IDisposable
             
             _process = proc;
             IsRunning = true;
+            // 附加到已运行进程 (如开机自启已先行拉起 app.py): 用系统报告的进程启动时间，
+            // 让主页运行时长从进程真实启动时刻算起，而非从附加时刻算起。
+            try
+            {
+                ProcessStartTime = proc.StartTime;
+            }
+            catch
+            {
+                ProcessStartTime = DateTime.Now;
+            }
             _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, true));
             _dispatcherHelper.RunOnUIThread(() => LogOutputReceived?.Invoke(this, $"[{DateTime.Now:HH:mm:ss}] [INFO] 已连接到运行中的 app.py 进程 (PID: {pid.Value})"));
             _dispatcherHelper.RunOnUIThread(() => LogOutputReceived?.Invoke(this, $"[{DateTime.Now:HH:mm:ss}] [INFO] 提示：附加的进程无法捕获日志输出，点击「重启」可启动新的日志捕获进程"));

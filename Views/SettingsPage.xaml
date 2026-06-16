@@ -7,15 +7,19 @@
     <ScrollViewer Background="Transparent">
         <StackPanel Padding="32" Spacing="24" MaxWidth="600" HorizontalAlignment="Left">
             <TextBlock Text="设置" FontSize="24" FontWeight="Bold"/>
-            
+
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="启动设置" FontSize="16" FontWeight="SemiBold"/>
-                    <ToggleSwitch Header="启动本程序时自动启动 app.py"
-                                  IsOn="{Binding AutoStartApp, Mode=TwoWay}"
-                                  OnContent="开" OffContent="关"/>
+                    <TextBlock Text="开机自启" FontSize="16" FontWeight="SemiBold"/>
+                    <ToggleSwitch x:Name="AutoStartToggle"
+                                  Header="开机静默启动 iFlyCompassGUI (应用与 app.py)"
+                                  IsOn="{Binding IsAutoStartEnabled, Mode=OneWay}"
+                                  OnContent="开" OffContent="关"
+                                  Toggled="AutoStartToggle_Toggled"/>
+                    <TextBlock Text="{Binding AutoStartStatusText}" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                    <TextBlock Text="启用后，开机时将以静默方式运行：不显示窗口、不显示托盘图标，仅在后台启动 app.py。再次手动启动程序时会唤出已运行的窗口。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -24,9 +28,13 @@
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
                     <TextBlock Text="窗口设置" FontSize="16" FontWeight="SemiBold"/>
-                    <ToggleSwitch Header="记住窗口大小和位置" 
+                    <ToggleSwitch Header="记住窗口大小和位置"
                                   IsOn="{Binding RememberWindowState, Mode=TwoWay}"
                                   OnContent="开" OffContent="关"/>
+                    <ToggleSwitch Header="关闭窗口时在后台运行（不在任务栏显示）"
+                                  IsOn="{Binding RunInBackgroundWhenClosed, Mode=TwoWay}"
+                                  OnContent="开" OffContent="关"/>
+                    <TextBlock Text="开启后，关闭主窗口将隐藏到后台继续运行 app.py，不显示任务栏图标。再次启动程序可唤出窗口；如需退出请在下方点击「退出 iFlyCompassGUI」。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             
@@ -80,9 +88,13 @@
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
                     <TextBlock Text="应用管理" FontSize="16" FontWeight="SemiBold"/>
-                    <Button Content="卸载 iFlyCompass" Command="{Binding UninstallCommand}"
-                            Style="{StaticResource DefaultButtonStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                            IsEnabled="{Binding IsUninstalling, Converter={StaticResource BoolNegationConverter}}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="卸载 iFlyCompass" Command="{Binding UninstallCommand}"
+                                Style="{StaticResource DefaultButtonStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                IsEnabled="{Binding IsUninstalling, Converter={StaticResource BoolNegationConverter}}"/>
+                        <Button Content="退出 iFlyCompassGUI" Command="{Binding ExitAppCommand}"
+                                Style="{StaticResource DefaultButtonStyle}"/>
+                    </StackPanel>
                     <ProgressRing IsActive="{Binding IsUninstalling}" Width="20" Height="20"
                                   HorizontalAlignment="Left"
                                   Visibility="{Binding IsUninstalling, Converter={StaticResource BoolToVisibilityConverter}}"/>
