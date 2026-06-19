@@ -5,29 +5,49 @@
     xmlns:vm="using:iFlyCompassGUI.ViewModels">
 
     <ScrollViewer Background="Transparent">
-        <StackPanel Padding="32" Spacing="24" MaxWidth="720" HorizontalAlignment="Left">
-            <TextBlock Text="关于" FontSize="24" FontWeight="Bold"/>
+        <StackPanel Padding="32" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
 
+            <!-- 页面标题 -->
+            <TextBlock Text="关于" FontSize="28" FontWeight="Bold"/>
+
+            <!-- 应用信息卡片 -->
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="24">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="iFlyCompass GUI" FontSize="24" FontWeight="Bold"/>
-                    <TextBlock Opacity="0.7" FontSize="13">
-                        <Run Text="GUI 版本: "/><Run Text="{Binding CurrentAppVersion}"/>
-                    </TextBlock>
-                    <TextBlock Opacity="0.7" FontSize="13">
-                        <Run Text="后端版本: "/><Run Text="{Binding CurrentBackendVersion}"/>
-                    </TextBlock>
-                    <TextBlock Text="iFlyCompass 的 Windows 桌面管理工具" Opacity="0.5" FontSize="13"/>
-                </StackPanel>
+                    CornerRadius="12" Padding="28">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="24">
+                    <Border Grid.Column="0" Width="72" Height="72" CornerRadius="14"
+                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Image Source="/Assets/Square150x150Logo.png" Width="48" Height="48" Stretch="Uniform"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="iFlyCompass GUI" FontSize="26" FontWeight="Bold"/>
+                        <TextBlock Text="iFlyCompass 的 Windows 桌面管理工具" Opacity="0.6" FontSize="13"/>
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                            <TextBlock Grid.Column="0" Text="GUI 版本" Opacity="0.55" FontSize="12"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding CurrentAppVersion}" FontSize="13"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="后端版本" Opacity="0.55" FontSize="12"
+                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            <TextBlock Grid.Column="3" Text="{Binding CurrentBackendVersion}" FontSize="13"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Border>
 
+            <!-- 应用更新 (GUI) -->
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="24">
+                    CornerRadius="12" Padding="24">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="应用更新 (GUI)" FontSize="16" FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE895;" FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="应用更新 (GUI)" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
 
                     <StackPanel Spacing="12" Orientation="Horizontal">
                         <Button Content="检查更新" Command="{Binding CheckAppUpdateCommand}"
@@ -64,16 +84,18 @@
                 </StackPanel>
             </Border>
 
+            <!-- 后端更新 (iFlyCompass) -->
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="24">
+                    CornerRadius="12" Padding="24">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="后端更新 (iFlyCompass)" FontSize="16" FontWeight="SemiBold"/>
-
-                    <StackPanel Spacing="8">
-                        <HyperlinkButton Content="GitHub 项目地址"
-                                         NavigateUri="https://github.com/MoyuZJ912/iFlyCompass"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE9D9;" FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="后端更新 (iFlyCompass)" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
+
+                    <HyperlinkButton Content="GitHub 项目地址" Padding="0"
+                                     NavigateUri="https://github.com/MoyuZJ912/iFlyCompass"/>
 
                     <StackPanel Spacing="12" Orientation="Horizontal">
                         <Button Content="检查更新" Command="{Binding CheckBackendUpdateCommand}"
@@ -104,16 +126,226 @@
                 </StackPanel>
             </Border>
 
+            <!-- 开源致谢 -->
+            <StackPanel Spacing="12" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xEB51;" FontSize="18" VerticalAlignment="Center"/>
+                    <TextBlock Text="开源致谢" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Text="本软件的开发与运行依赖以下开源项目，在此向所有贡献者致谢。" Opacity="0.55" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- 本项目与后端 -->
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="24">
+                    CornerRadius="12" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="本项目" Opacity="0.6" FontSize="12" FontWeight="SemiBold"/>
+
+                    <!-- iFlyCompass GUI -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="iFlyCompass GUI" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="本桌面管理工具本身，基于 MIT 协议开源。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="iFlyCompassGUI GitHub 仓库" FontSize="12" Padding="0"
+                                             NavigateUri="https://github.com/Magniswan/iFlyCompassGUI"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- iFlyCompass 后端 -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="iFlyCompass" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="GPLv3" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="本软件所管理的后端程序。按 GPLv3 协议开源，源代码可从以下地址获取。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="iFlyCompass GitHub 仓库" FontSize="12" Padding="0"
+                                             NavigateUri="https://github.com/MoyuZJ912/iFlyCompass"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 运行时工具 -->
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="12" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="运行时工具" Opacity="0.6" FontSize="12" FontWeight="SemiBold"/>
+
+                    <!-- FFmpeg -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="FFmpeg" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="GPLv2+ / LGPLv2.1+" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="用于视频导入时的 H.265 编码转换与分辨率调整。一款领先的多媒体处理框架，可解码、编码、转码、复用、解复用、流化、过滤和播放几乎所有音视频格式。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="ffmpeg.org" FontSize="12" Padding="0"
+                                             NavigateUri="https://ffmpeg.org"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- aria2c -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="aria2 (aria2c)" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="GPLv2" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="用于视频下载器，支持 HTTP/HTTPS、FTP、SFTP、BitTorrent 及 Metalink 协议，多连接并发下载以提升速度。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="aria2.github.io" FontSize="12" Padding="0"
+                                             NavigateUri="https://aria2.github.io"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Python -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Python 3.12.10" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="PSF License" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="iFlyCompass 后端运行的嵌入式 Python 运行时，安装时自动下载并配置。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="python.org" FontSize="12" Padding="0"
+                                             NavigateUri="https://www.python.org"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- .NET -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text=".NET 10" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="本桌面应用所基于的 .NET 运行时与 SDK，由 Microsoft 开源维护。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="dotnet.microsoft.com" FontSize="12" Padding="0"
+                                             NavigateUri="https://dotnet.microsoft.com"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 第三方库 -->
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="12" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="第三方库" Opacity="0.6" FontSize="12" FontWeight="SemiBold"/>
+
+                    <!-- WinUI 3 -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="WinUI 3 / Windows App SDK" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="本应用使用的原生 Windows UI 框架，提供现代化的控件与 Fluent 设计风格。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="microsoft/WindowsAppSDK" FontSize="12" Padding="0"
+                                             NavigateUri="https://github.com/microsoft/WindowsAppSDK"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- CommunityToolkit.Mvvm -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="CommunityToolkit.Mvvm" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="MVVM 架构支持库，提供源生成器驱动的可观察属性与命令。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="CommunityToolkit/dotnet" FontSize="12" Padding="0"
+                                             NavigateUri="https://github.com/CommunityToolkit/dotnet"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Microsoft.Data.Sqlite -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Microsoft.Data.Sqlite" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="用于用户数据的 SQLite 轻量级数据库访问。底层 SQLite 采用公有领域 (Public Domain) 授权。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="EF Core SQLite Provider" FontSize="12" Padding="0"
+                                             NavigateUri="https://learn.microsoft.com/dotnet/ef/core/providers/sqlite"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Microsoft.Extensions.DependencyInjection -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Microsoft.Extensions.DependencyInjection" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                    <TextBlock Text="MIT" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="依赖注入容器，负责应用各服务之间的装配与生命周期管理。" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                            <HyperlinkButton Content="dotnet/runtime" FontSize="12" Padding="0"
+                                             NavigateUri="https://github.com/dotnet/runtime"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 免责声明 -->
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="12" Padding="20">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="开源许可" FontSize="16" FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="免责声明" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12">
-                        本软件基于 MIT 协议开源。
+                        本软件（iFlyCompass GUI）基于 MIT 协议开源。所管理的后端程序 iFlyCompass 基于 GPLv3 协议开源。
                     </TextBlock>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12">
-                        使用的第三方开源库：WinUI 3 (Windows App SDK)、CommunityToolkit.Mvvm、Microsoft.Data.Sqlite、Microsoft.Extensions.DependencyInjection。
+                        iFlyCompass 及上述第三方组件均按"原样"提供，不提供任何明示或暗示的担保，包括但不限于适销性和特定用途适用性的担保。详见各组件对应的开源协议。
                     </TextBlock>
                 </StackPanel>
             </Border>

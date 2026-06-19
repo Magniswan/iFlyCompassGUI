@@ -51,6 +51,7 @@ public partial class HomeViewModel : ObservableObject
         _processService.RunningStateChanged += OnRunningStateChanged;
         _processService.LogOutputReceived += OnLogOutputReceived;
         _processService.AccessAddressChanged += OnAccessAddressChanged;
+        _configService.SettingsChanged += OnSettingsChanged;
         IsRunning = _processService.IsRunning;
         StatusText = IsRunning ? "运行中" : "已停止";
         AccessAddress = _processService.AccessAddress ?? "";
@@ -110,6 +111,9 @@ public partial class HomeViewModel : ObservableObject
         else
         {
             StopUptimeTimer();
+            // 停止后立即清空访问地址 (即使 ClearAccessAddress 的事件尚未送达 UI)，
+            // 确保主页"访问地址"行同步隐藏。
+            AccessAddress = _processService.AccessAddress ?? "";
         }
     }
 
@@ -143,6 +147,11 @@ public partial class HomeViewModel : ObservableObject
     private void OnAccessAddressChanged(object? sender, string address)
     {
         _dispatcherHelper.RunOnUIThread(() => AccessAddress = address ?? "");
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        _dispatcherHelper.RunOnUIThread(DetectVersion);
     }
 
     private void OnLogOutputReceived(object? sender, string logLine)

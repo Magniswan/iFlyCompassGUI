@@ -40,7 +40,10 @@ public class InstallService : IInstallService
                     CopyDirectory(tempDir, backupTemp, []);
                 }
 
-                Directory.Delete(targetDir, true);
+                if (!await DeleteDirectoryWithRetryAsync(targetDir))
+                {
+                    return new UninstallResult { Success = false, Message = "卸载失败: 部分文件仍被占用，请关闭所有相关程序后重试" };
+                }
 
                 // Restore backups if they exist
                 if (Directory.Exists(backupInstance))
@@ -59,7 +62,10 @@ public class InstallService : IInstallService
 
             if (Directory.Exists(pythonDir))
             {
-                Directory.Delete(pythonDir, true);
+                if (!await DeleteDirectoryWithRetryAsync(pythonDir))
+                {
+                    return new UninstallResult { Success = false, Message = "卸载失败: Python 环境文件仍被占用，请关闭所有相关程序后重试" };
+                }
             }
 
             return new UninstallResult { Success = true, Message = "卸载完成" };
@@ -67,6 +73,41 @@ public class InstallService : IInstallService
         catch (Exception ex)
         {
             return new UninstallResult { Success = false, Message = $"卸载失败: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// 带重试的目录删除。进程终止后文件锁可能需要短暂时间才能释放，
+    /// 因此在遇到 IOException 时自动重试。
+    /// </summary>
+    private static async Task<bool> DeleteDirectoryWithRetryAsync(string path, int maxRetries = 3, int delayMs = 1000)
+    {
+        for (var i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                Directory.Delete(path, true);
+                return true;
+            }
+            catch (IOException) when (i < maxRetries - 1)
+            {
+                await Task.Delay(delayMs);
+            }
+            catch (UnauthorizedAccessException) when (i < maxRetries - 1)
+            {
+                await Task.Delay(delayMs);
+            }
+        }
+
+        // 最后一次尝试
+        try
+        {
+            Directory.Delete(path, true);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

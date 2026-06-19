@@ -9,6 +9,8 @@ public class ConfigService : IConfigService
     private readonly string _configPath;
     private AppSettings _settings = new();
 
+    public event EventHandler? SettingsChanged;
+
     public ConfigService()
     {
         var appDir = PathHelper.DataDirectory;
@@ -31,5 +33,6 @@ public class ConfigService : IConfigService
     {
         var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(_configPath, json);
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 }

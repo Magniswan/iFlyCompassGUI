@@ -160,7 +160,7 @@ public class ProcessService : IProcessService, IDisposable
         {
             IsRunning = false;
             ProcessStartTime = null;
-            AccessAddress = null;
+            ClearAccessAddress();
             _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
             _process = null;
             return;
@@ -182,7 +182,7 @@ public class ProcessService : IProcessService, IDisposable
         
         IsRunning = false;
         ProcessStartTime = null;
-        AccessAddress = null;
+        ClearAccessAddress();
         _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
         _process = null;
     }
@@ -247,6 +247,14 @@ public class ProcessService : IProcessService, IDisposable
         AccessAddress = address;
         _dispatcherHelper.RunOnUIThread(() => AccessAddressChanged?.Invoke(this, address));
     }
+
+    /// <summary>进程停止/异常退出时清空访问地址，并通知 UI 隐藏"访问地址"一行。</summary>
+    private void ClearAccessAddress()
+    {
+        if (AccessAddress == null) return;
+        AccessAddress = null;
+        _dispatcherHelper.RunOnUIThread(() => AccessAddressChanged?.Invoke(this, ""));
+    }
     
     private void OnProcessExited(object? sender, EventArgs e)
     {
@@ -255,7 +263,7 @@ public class ProcessService : IProcessService, IDisposable
         
         IsRunning = false;
         ProcessStartTime = null;
-        AccessAddress = null;
+        ClearAccessAddress();
         _dispatcherHelper.RunOnUIThread(() => RunningStateChanged?.Invoke(this, false));
         
         try
@@ -439,6 +447,91 @@ public class ProcessService : IProcessService, IDisposable
         return null;
     }
     
+    public async Task ForceKillAllAsync()
+    {
+        // 先通过 StopAsync 停止本进程管理的 Python 进程
+        await StopAsync();
+
+        // 再通过端口查找并强制终止所有占用 5002 端口的 Python 进程
+        // (可能存在附加的进程或 StopAsync 未能终止的残留进程)
+        var maxRetries = 3;
+        for (var i = 0; i < maxRetries; i++)
+        {
+            var pid = FindPythonProcessOnPort(5002);
+            if (pid == null) break;
+
+            try
+            {
+                var proc = Process.GetProcessById(pid.Value);
+                proc.Kill(true);
+                await proc.WaitForExitAsync();
+                proc.Dispose();
+            }
+            catch
+            {
+                // 进程可能已退出，忽略
+            }
+
+            await Task.Delay(500);
+        }
+
+        // 额外检查：查找所有以 _appPyPath 为参数的 Python 进程
+        try
+        {
+            foreach (var proc in Process.GetProcessesByName("python"))
+            {
+                try
+                {
+                    var cmdLine = proc.MainModule?.FileName ?? "";
+                    if (cmdLine.Contains("python", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 检查命令行是否包含 app.py 路径
+                        try
+                        {
+                            using var wmiProc = System.Diagnostics.Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "wmic",
+                                Arguments = $"process where ProcessId={proc.Id} get CommandLine /value",
+                                RedirectStandardOutput = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            });
+                            if (wmiProc != null)
+                            {
+                                var output = await wmiProc.StandardOutput.ReadToEndAsync();
+                                wmiProc.WaitForExit(3000);
+                                if (output.Contains("app.py", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    proc.Kill(true);
+                                    await proc.WaitForExitAsync();
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // 无法获取命令行，跳过
+                        }
+                    }
+                }
+                catch
+                {
+                    // 无法访问进程信息，跳过
+                }
+                finally
+                {
+                    proc.Dispose();
+                }
+            }
+        }
+        catch
+        {
+            // 枚举进程失败，忽略
+        }
+
+        // 等待文件锁释放
+        await Task.Delay(1000);
+    }
+
     public void Dispose()
     {
         _cts.Cancel();
