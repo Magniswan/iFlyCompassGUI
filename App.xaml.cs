@@ -14,6 +14,8 @@ public partial class App : Application
     /// <summary>
     /// 是否以静默模式启动 (由 Program.cs 根据开机自启激活判定)。
     /// 静默模式下不显示窗口、不显示托盘，仅在后台运行 app.py。
+    /// app.py 通过 Job Object 与 GUI 进程绑定：GUI 退出时 app.py 一并被终止，
+    /// 因此静默模式下只要 GUI 进程未退出，app.py 即持续后台运行。
     /// </summary>
     public static bool IsSilentStartup { get; set; }
 
@@ -22,6 +24,9 @@ public partial class App : Application
         WinRT.ComWrappersSupport.InitializeComWrappers();
         this.InitializeComponent();
         Services = ConfigureServices();
+        // 尽早创建 Job Object，使后续所有子进程 (app.py、pip、ffmpeg、aria2c 等)
+        // 都能绑定到 Job 上，随 GUI 进程退出被一并终止。
+        JobObjectHelper.Initialize();
     }
     
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -46,6 +51,7 @@ public partial class App : Application
 
     /// <summary>
     /// 静默启动: 不显示任何窗口，后台运行 app.py。用户再次手动启动时会通过单实例唤出窗口。
+    /// app.py 由 ProcessService 启动并加入 Job Object，其生命周期跟随 GUI 进程。
     /// </summary>
     private async Task SilentStartAsync()
     {

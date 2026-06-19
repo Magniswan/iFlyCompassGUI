@@ -27,10 +27,4 @@ public interface IProcessService
     Task StopAsync();
     Task RestartAsync();
     bool TryAttachToExistingProcess();
-
-    /// <summary>
-    /// 强制终止所有与当前安装相关的 Python 进程 (包括本进程启动的和附加的)。
-    /// 用于卸载前确保所有 Python 进程已退出，避免文件被占用导致删除失败。
-    /// </summary>
-    Task ForceKillAllAsync();
 }

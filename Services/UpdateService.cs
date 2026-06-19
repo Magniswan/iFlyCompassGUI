@@ -141,6 +141,7 @@ public class UpdateService : IUpdateService
 
                 using var depProcess = new Process { StartInfo = psi };
                 depProcess.Start();
+                JobObjectHelper.Assign(depProcess);
 
                 // Must drain stdout/stderr to prevent deadlock when buffers fill up
                 var depOutTask = Task.Run(async () =>
@@ -180,6 +181,7 @@ public class UpdateService : IUpdateService
 
                         using var retryProcess = new Process { StartInfo = retryPsi };
                         retryProcess.Start();
+                        JobObjectHelper.Assign(retryProcess);
 
                         var retryOutTask = Task.Run(async () =>
                         {
@@ -231,6 +233,7 @@ public class UpdateService : IUpdateService
 
         using var process = new Process { StartInfo = psi };
         process.Start();
+        JobObjectHelper.Assign(process);
 
         var outTask = Task.Run(async () =>
         {

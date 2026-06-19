@@ -182,8 +182,8 @@ public partial class SettingsViewModel : ObservableObject
 
     /// <summary>
     /// 真正退出整个 GUI 进程。
-    /// 用于「关闭窗口后台运行」启用时提供退出入口；app.py 作为独立子进程由 ProcessService 管理，
-    /// 其生命周期不受此调用影响 (后台继续运行)。
+    /// 调用后 GUI 进程退出，Job Object 随之关闭并自动终止 app.py 等所有子进程。
+    /// 用于「后台运行」启用时提供完全退出入口。
     /// </summary>
     [RelayCommand]
     private void ExitApp()
@@ -194,7 +194,8 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task UninstallAsync()
     {
-        var confirm = await _dialogService.ShowConfirmAsync("确认卸载", "确定要卸载 iFlyCompass 吗？这将删除所有程序文件和 Python 环境，但会保留 instance 和 temp 目录中的数据。");
+        var confirm = await _dialogService.ShowConfirmAsync("确认卸载",
+            "确定要卸载 iFlyCompass 吗？\n\n卸载将删除 iFlyCompass 程序文件和内置 Python 环境数据。正在运行的 app.py 及相关子进程会自动停止。instance 和 temp 目录中的用户数据将被保留。");
         if (!confirm) return;
 
         IsUninstalling = true;
@@ -214,7 +215,7 @@ public partial class SettingsViewModel : ObservableObject
                 _configService.Settings.LastSelectedPage = "";
                 await _configService.SaveAsync();
 
-                // 卸载时关闭开机自启，避免下次登录时静默启动一个已卸载的应用。
+                // 卸载时关闭开机自启，避免下次开机时静默启动一个已卸载的应用。
                 await _startupService.DisableAsync();
                 RefreshAutoStartState();
 

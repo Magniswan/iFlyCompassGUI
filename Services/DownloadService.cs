@@ -465,6 +465,7 @@ public class DownloadService : IDownloadService
         };
 
         process.Start();
+        JobObjectHelper.Assign(process);
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 

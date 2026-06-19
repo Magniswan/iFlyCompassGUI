@@ -14,12 +14,12 @@
                 <StackPanel Spacing="16">
                     <TextBlock Text="开机自启" FontSize="16" FontWeight="SemiBold"/>
                     <ToggleSwitch x:Name="AutoStartToggle"
-                                  Header="开机静默启动 iFlyCompassGUI (应用与 app.py)"
+                                  Header="开机静默启动"
                                   IsOn="{Binding IsAutoStartEnabled, Mode=OneWay}"
                                   OnContent="开" OffContent="关"
                                   Toggled="AutoStartToggle_Toggled"/>
                     <TextBlock Text="{Binding AutoStartStatusText}" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
-                    <TextBlock Text="启用后，开机时将以静默方式运行：不显示窗口、不显示托盘图标，仅在后台启动 app.py。再次手动启动程序时会唤出已运行的窗口。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                    <TextBlock Text="启用后，开机时将以静默方式启动应用与 app.py：不显示窗口、不显示托盘图标，全部在后台运行。再次手动启动程序时会唤出已运行的窗口。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -31,10 +31,11 @@
                     <ToggleSwitch Header="记住窗口大小和位置"
                                   IsOn="{Binding RememberWindowState, Mode=TwoWay}"
                                   OnContent="开" OffContent="关"/>
-                    <ToggleSwitch Header="关闭窗口时在后台运行（不在任务栏显示）"
+                    <ToggleSwitch Header="关闭窗口时后台运行"
                                   IsOn="{Binding RunInBackgroundWhenClosed, Mode=TwoWay}"
                                   OnContent="开" OffContent="关"/>
-                    <TextBlock Text="开启后，关闭主窗口将隐藏到后台继续运行 app.py，不显示任务栏图标。再次启动程序可唤出窗口；如需退出请在下方点击「退出 iFlyCompassGUI」。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                    <TextBlock Text="开启后，关闭主窗口时应用与 app.py 将隐藏到后台继续运行，不显示任务栏图标；再次启动程序可唤出窗口，如需完全退出请在下方点击「退出 iFlyCompassGUI」。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                    <TextBlock Text="未开启此项时，关闭窗口将同时退出应用与 app.py；若此时仍有子进程（app.py、下载、转码等）在运行，会弹出确认对话框询问是否改为后台运行。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             
@@ -88,6 +89,7 @@
                     CornerRadius="8" Padding="24">
                 <StackPanel Spacing="16">
                     <TextBlock Text="应用管理" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="卸载将删除 iFlyCompass 程序文件与内置 Python 环境数据，并自动停止正在运行的 app.py。instance 和 temp 目录中的用户数据会被保留。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Button Content="卸载 iFlyCompass" Command="{Binding UninstallCommand}"
                                 Style="{StaticResource DefaultButtonStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}"

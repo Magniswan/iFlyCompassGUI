@@ -27,7 +27,7 @@ public class DialogService : IDialogService
     {
         var window = GetMainWindow();
         if (window?.Content == null) return false;
-        
+
         var dialog = new ContentDialog
         {
             Title = title,
@@ -38,6 +38,31 @@ public class DialogService : IDialogService
         };
         var result = await dialog.ShowAsync();
         return result == ContentDialogResult.Primary;
+    }
+
+    public async Task<CloseChoice> ShowCloseConfirmAsync(string title, string message)
+    {
+        var window = GetMainWindow();
+        if (window?.Content == null) return CloseChoice.Cancel;
+
+        // 三按钮：主按钮=始终后台运行，次按钮=取消，关闭按钮=仍要关闭。
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = message,
+            PrimaryButtonText = "始终后台运行",
+            SecondaryButtonText = "取消",
+            CloseButtonText = "仍要关闭",
+            DefaultButton = ContentDialogButton.Secondary,
+            XamlRoot = window.Content.XamlRoot
+        };
+        var result = await dialog.ShowAsync();
+        return result switch
+        {
+            ContentDialogResult.Primary => CloseChoice.AlwaysBackground,
+            ContentDialogResult.Secondary => CloseChoice.Cancel,
+            _ => CloseChoice.Close
+        };
     }
     
     public async Task<string?> ShowInputAsync(string title, string message, string defaultText = "")

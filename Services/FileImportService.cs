@@ -137,6 +137,7 @@ public class FileImportService : IFileImportService
             };
 
             process.Start();
+            JobObjectHelper.Assign(process);
             process.BeginErrorReadLine();
 
             using var registration = cancellationToken.Register(() =>
@@ -228,6 +229,7 @@ public class FileImportService : IFileImportService
             };
 
             process.Start();
+            JobObjectHelper.Assign(process);
             process.BeginErrorReadLine();
 
             using var registration = cancellationToken.Register(() =>
@@ -332,6 +334,7 @@ public class FileImportService : IFileImportService
             };
 
             process.Start();
+            JobObjectHelper.Assign(process);
             process.BeginErrorReadLine();
 
             using var registration = cancellationToken.Register(() =>
@@ -443,6 +446,7 @@ public class FileImportService : IFileImportService
             };
 
             process.Start();
+            JobObjectHelper.Assign(process);
             process.BeginErrorReadLine();
 
             using var registration = cancellationToken.Register(() =>
@@ -552,7 +556,8 @@ public class FileImportService : IFileImportService
                 _gpuAccelAvailable = false;
                 return false;
             }
-            
+            JobObjectHelper.Assign(process);
+
             var output = await process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
             
@@ -580,6 +585,7 @@ public class FileImportService : IFileImportService
         
         using var process = new Process { StartInfo = psi };
         process.Start();
+        JobObjectHelper.Assign(process);
         var output = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
         return output.Trim();
@@ -598,6 +604,7 @@ public class FileImportService : IFileImportService
         
         using var process = new Process { StartInfo = psi };
         process.Start();
+        JobObjectHelper.Assign(process);
         var output = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
         return double.TryParse(output.Trim(), out var d) ? d : 0;

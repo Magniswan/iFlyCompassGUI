@@ -14,6 +14,10 @@ public sealed partial class MainWindow : Window
     private readonly IConfigService _configService;
     private readonly DispatcherHelper _dispatcherHelper;
     private readonly IDialogService _dialogService;
+
+    /// <summary>用户已确认关闭，第二次进入 OnWindowClosed 时放行真正关闭流程。</summary>
+    private bool _isClosing;
+
     public Frame MainContentFrame => ContentFrame;
     
     public MainWindow()
@@ -116,19 +120,71 @@ public sealed partial class MainWindow : Window
         _configService.Settings.WindowHeight = size.Height;
         _ = _configService.SaveAsync();
 
-        // 启用「关闭窗口后台运行」时：拦截关闭，仅隐藏窗口 (不显示任务栏图标)，进程继续运行。
-        // 用户可再次启动程序 (经单实例重定向) 唤回窗口，或在设置页点击「退出」真正结束进程。
-        if (_configService.Settings.RunInBackgroundWhenClosed)
+        // 已通过 HandleCloseAsync 决定真正关闭：放行，GUI 进程退出后 Job Object 自动终止所有子进程。
+        if (_isClosing) return;
+
+        // 拦截首次关闭，转交 HandleCloseAsync 决定是后台运行、取消还是真正关闭。
+        args.Handled = true;
+        _ = HandleCloseAsync();
+    }
+
+    /// <summary>
+    /// 处理用户关闭窗口的意图。
+    /// - 已启用「关闭窗口后台运行」: 直接隐藏窗口，GUI 与 app.py 继续后台运行。
+    /// - 未启用但仍有子进程 (app.py、下载、转码等) 运行: 弹出三选项确认。
+    /// - 未启用且无子进程: 直接真正关闭。
+    /// </summary>
+    private async Task HandleCloseAsync()
+    {
+        try
         {
-            args.Handled = true;
-            try
+            // 后台运行: 隐藏窗口 (不显示任务栏图标)，进程继续运行，子进程不受影响。
+            if (_configService.Settings.RunInBackgroundWhenClosed)
             {
-                this.AppWindow.Hide();
+                HideWindowInternal();
+                return;
             }
-            catch
+
+            // 仍有子进程运行时弹出确认，避免误关导致 app.py/下载被中断。
+            if (JobObjectHelper.HasActiveProcesses)
             {
-                // AppWindow 尚未就绪时忽略。
+                var choice = await _dialogService.ShowCloseConfirmAsync(
+                    "正在关闭 iFlyCompassGUI",
+                    "当前仍有子进程 (app.py、下载、转码等) 正在运行。\n关闭应用将同时终止这些进程。\n\n你可以选择改为后台运行，或仍要关闭。");
+                switch (choice)
+                {
+                    case CloseChoice.AlwaysBackground:
+                        _configService.Settings.RunInBackgroundWhenClosed = true;
+                        await _configService.SaveAsync();
+                        HideWindowInternal();
+                        return;
+                    case CloseChoice.Cancel:
+                        return;
+                    case CloseChoice.Close:
+                        break;
+                }
             }
+
+            // 真正关闭：标记并再次触发 Close，此次 OnWindowClosed 会因 _isClosing=true 而放行。
+            _isClosing = true;
+            _dispatcherHelper.RunOnUIThread(() => this.Close());
+        }
+        catch
+        {
+            // 弹窗或关闭过程中出现异常时重置标志，避免后续关闭被永久拦截。
+            _isClosing = false;
+        }
+    }
+
+    private void HideWindowInternal()
+    {
+        try
+        {
+            this.AppWindow.Hide();
+        }
+        catch
+        {
+            // AppWindow 尚未就绪时忽略。
         }
     }
     

@@ -252,6 +252,7 @@ public class InstallService : IInstallService
             using var process = Process.Start(psi);
             if (process != null)
             {
+                JobObjectHelper.Assign(process);
                 await process.WaitForExitAsync();
             }
         }
@@ -324,6 +325,7 @@ public class InstallService : IInstallService
 
         using var process = new Process { StartInfo = psi };
         process.Start();
+        JobObjectHelper.Assign(process);
 
         var outputTask = Task.Run(async () =>
         {
@@ -395,6 +397,7 @@ public class InstallService : IInstallService
 
                 using var retryProcess = new Process { StartInfo = retryPsi };
                 retryProcess.Start();
+                JobObjectHelper.Assign(retryProcess);
 
                 // Must drain stdout/stderr to prevent deadlock when buffers fill up
                 var retryOutTask = Task.Run(async () =>
@@ -432,6 +435,7 @@ public class InstallService : IInstallService
 
         using var process = new Process { StartInfo = psi };
         process.Start();
+        JobObjectHelper.Assign(process);
 
         var outTask = Task.Run(async () =>
         {
