@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using System.ComponentModel;
 using iFlyCompassGUI.Helpers;
 using iFlyCompassGUI.Services;
 using iFlyCompassGUI.Views;
@@ -30,34 +31,23 @@ public sealed partial class MainWindow : Window
         _dialogService = (IDialogService)((App)App.Current).Services.GetService(typeof(IDialogService))!;
         ((FrameworkElement)this.Content).DataContext = _viewModel;
 
-        Title = "iFlyCompass GUI";
+        Title = AppConstants.DisguiseName;
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(titleBar);
-        
+
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        Activated += OnWindowActivated;
+
         ((FrameworkElement)this.Content).Loaded += async (s, e) =>
         {
             await _viewModel.InitializeAsync();
 
             RestoreWindowPosition();
 
-            if (!_viewModel.IsInstalled)
-            {
-                if (_viewModel.IsPartiallyInstalled)
-                {
-                    // Installation was interrupted — go directly to install page
-                    WelcomeFrame.Navigate(typeof(InstallPage));
-                }
-                else
-                {
-                    WelcomeFrame.Navigate(typeof(WelcomePage));
-                }
-            }
-            else
-            {
-                NavigateToLastPage();
-            }
-
-
+            // 始终先进入 A界面 (伪装页)；未键入暗码前不展示任何真实界面或安装引导，
+            // 即便 iFlyCompass 尚未安装也是如此。
+            GateFrame.Navigate(typeof(DisguisePage));
+            UpdateTitleBarAppearance();
         };
         
         Closed += OnWindowClosed;
@@ -72,6 +62,40 @@ public sealed partial class MainWindow : Window
             appWindow.Resize(new Windows.Graphics.SizeInt32(settings.WindowWidth, settings.WindowHeight));
             appWindow.Move(new Windows.Graphics.PointInt32(settings.WindowX, settings.WindowY));
         }
+    }
+
+    /// <summary>
+    /// 根据解锁状态切换标题栏外观 (标题文字 + 图标)。
+    /// - 锁定 (A界面/伪装页): 显示「WinTune Pro」+ WinTune 图标。
+    /// - 解锁 (真实界面): 显示「iFlyCompass GUI」+ iFlyCompass 图标。
+    /// </summary>
+    private void UpdateTitleBarAppearance()
+    {
+        if (_viewModel.IsUnlocked)
+        {
+            Title = "iFlyCompass GUI";
+            titleBar.Title = "iFlyCompass GUI";
+            titleBar.IconSource = new Microsoft.UI.Xaml.Controls.ImageIconSource
+            {
+                ImageSource = CreateIconImageSource("/Assets/iFlyIcon.ico")
+            };
+        }
+        else
+        {
+            Title = AppConstants.DisguiseName;
+            titleBar.Title = AppConstants.DisguiseName;
+            titleBar.IconSource = new Microsoft.UI.Xaml.Controls.ImageIconSource
+            {
+                ImageSource = CreateIconImageSource("/Assets/WindowIcon.ico")
+            };
+        }
+    }
+
+    /// <summary>从相对路径 (如 /Assets/x.ico) 构造可用于 ImageIconSource 的 ImageSource。</summary>
+    private static Microsoft.UI.Xaml.Media.ImageSource CreateIconImageSource(string relativePath)
+    {
+        var path = relativePath.TrimStart('/');
+        return new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri($"ms-appx:///{path}"));
     }
 
     private void NavigateToLastPage()
@@ -146,11 +170,12 @@ public sealed partial class MainWindow : Window
             }
 
             // 仍有子进程运行时弹出确认，避免误关导致 app.py/下载被中断。
+            // 对外文案已伪装: 不提及 app.py/下载/转码等真实身份。
             if (JobObjectHelper.HasActiveProcesses)
             {
                 var choice = await _dialogService.ShowCloseConfirmAsync(
-                    "正在关闭 iFlyCompassGUI",
-                    "当前仍有子进程 (app.py、下载、转码等) 正在运行。\n关闭应用将同时终止这些进程。\n\n你可以选择改为后台运行，或仍要关闭。");
+                    $"正在关闭 {AppConstants.DisguiseName}",
+                    "有后台服务正在运行，关闭应用将终止该服务。\n\n你可以选择改为后台运行，或仍要关闭。");
                 switch (choice)
                 {
                     case CloseChoice.AlwaysBackground:
@@ -194,6 +219,44 @@ public sealed partial class MainWindow : Window
         _viewModel.IsInstalled = true;
         _configService.Settings.IsInstalled = true;
         _ = _configService.SaveAsync();
+    }
+
+    /// <summary>
+    /// 按 tag 跳转到指定页面，并同步侧边栏选中项。
+    /// 用于设置页「前往」按钮等程序化导航场景，复用 NavView_SelectionChanged 的 tag→page 映射。
+    /// </summary>
+    public void NavigateToPage(string tag)
+    {
+        Type? pageType = tag switch
+        {
+            "Home" => typeof(HomePage),
+            "Novel" => typeof(NovelManagerPage),
+            "Video" => typeof(VideoManagerPage),
+            "AI" => typeof(AIConfigPage),
+            "Users" => typeof(UserManagerPage),
+            "Log" => typeof(LogPage),
+            "About" => typeof(AboutPage),
+            "Settings" => typeof(SettingsPage),
+            _ => null
+        };
+
+        if (pageType == null) return;
+
+        if (ContentFrame.CurrentSourcePageType != pageType)
+        {
+            ContentFrame.Navigate(pageType);
+            SaveCurrentPage(tag);
+        }
+
+        // 同步侧边栏选中项，避免停留在「设置」上误导用户
+        foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems))
+        {
+            if (item is NavigationViewItem nvi && nvi.Tag?.ToString() == tag)
+            {
+                NavView.SelectedItem = nvi;
+                break;
+            }
+        }
     }
 
     /// <summary>
@@ -264,12 +327,93 @@ public sealed partial class MainWindow : Window
         public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }
 
+    /// <summary>
+    /// 卸载后回到 A界面 (伪装页)。设置 IsInstalled=false 并重新锁定，
+    /// 用户需再次键入暗码后才会进入安装/欢迎界面 (此时 iFlyCompass 已卸载)。
+    /// </summary>
     public void NavigateToWelcome()
     {
         WelcomeFrame.Navigate(typeof(WelcomePage));
         _viewModel.IsInstalled = false;
         _configService.Settings.IsInstalled = false;
         _ = _configService.SaveAsync();
+        LockToGate();
+    }
+
+    /// <summary>
+    /// 解锁后的导航: 根据安装状态进入对应真实界面。
+    /// - 已安装: 恢复上次页面 (主页)。
+    /// - 中断的安装: 直接进入安装页恢复。
+    /// - 未安装: 进入欢迎/安装引导页。
+    /// </summary>
+    private void OnUnlocked()
+    {
+        if (_viewModel.IsInstalled)
+        {
+            NavigateToLastPage();
+        }
+        else if (_viewModel.IsPartiallyInstalled)
+        {
+            // Installation was interrupted — go directly to install page
+            WelcomeFrame.Navigate(typeof(InstallPage));
+        }
+        else
+        {
+            WelcomeFrame.Navigate(typeof(WelcomePage));
+        }
+    }
+
+    /// <summary>重新锁定到 A界面: 导航到新的伪装页实例以清空按键缓冲。</summary>
+    private void OnLocked()
+    {
+        GateFrame.Navigate(typeof(DisguisePage));
+    }
+
+    /// <summary>强制回到 A界面 (重置/唤起旧进程时使用)。不改变安装状态。</summary>
+    public void LockToGate()
+    {
+        _viewModel.Lock();
+    }
+
+    /// <summary>唤起旧进程时使用: 先重新锁定到 A界面，再显示并前置窗口。</summary>
+    public void ShowAtGate()
+    {
+        _dispatcherHelper.RunOnUIThread(() =>
+        {
+            LockToGate();
+            ShowWindow();
+        });
+    }
+
+    /// <summary>响应 MainViewModel 属性变化: IsUnlocked 切换时在解锁/锁定界面间导航。</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsUnlocked))
+        {
+            _dispatcherHelper.RunOnUIThread(() =>
+            {
+                UpdateTitleBarAppearance();
+                if (_viewModel.IsUnlocked)
+                    OnUnlocked();
+                else
+                    OnLocked();
+            });
+        }
+    }
+
+    /// <summary>
+    /// 窗口被激活 (获得焦点) 时，若仍处于锁定状态则重新聚焦 A界面以捕获按键。
+    /// 防止用户切换窗口后焦点丢失导致暗码无法输入。
+    /// </summary>
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+            return;
+
+        if (!_viewModel.IsUnlocked && GateFrame.Content is DisguisePage gate)
+        {
+            _dispatcherHelper.RunOnUIThread(() => gate.EnsureFocus());
+        }
     }
 
     private void TitleBar_PaneToggleRequested(TitleBar sender, object args)

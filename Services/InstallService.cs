@@ -23,21 +23,14 @@ public class InstallService : IInstallService
 
             if (Directory.Exists(targetDir))
             {
-                // Preserve instance and temp directories if they exist
+                // 仅保留 instance 目录（用户数据库等持久数据）；temp 为运行缓存，随卸载一并删除。
                 var instanceDir = Path.Combine(targetDir, "instance");
-                var tempDir = Path.Combine(targetDir, "temp");
                 var backupInstance = Path.Combine(Path.GetTempPath(), "iFlyCompass_instance_backup");
-                var backupTemp = Path.Combine(Path.GetTempPath(), "iFlyCompass_temp_backup");
 
                 if (Directory.Exists(instanceDir))
                 {
                     if (Directory.Exists(backupInstance)) Directory.Delete(backupInstance, true);
                     CopyDirectory(instanceDir, backupInstance, []);
-                }
-                if (Directory.Exists(tempDir))
-                {
-                    if (Directory.Exists(backupTemp)) Directory.Delete(backupTemp, true);
-                    CopyDirectory(tempDir, backupTemp, []);
                 }
 
                 if (!await DeleteDirectoryWithRetryAsync(targetDir))
@@ -45,18 +38,12 @@ public class InstallService : IInstallService
                     return new UninstallResult { Success = false, Message = "卸载失败: 部分文件仍被占用，请关闭所有相关程序后重试" };
                 }
 
-                // Restore backups if they exist
+                // Restore instance backup if it exists
                 if (Directory.Exists(backupInstance))
                 {
                     Directory.CreateDirectory(targetDir);
                     CopyDirectory(backupInstance, instanceDir, []);
                     Directory.Delete(backupInstance, true);
-                }
-                if (Directory.Exists(backupTemp))
-                {
-                    Directory.CreateDirectory(targetDir);
-                    CopyDirectory(backupTemp, tempDir, []);
-                    Directory.Delete(backupTemp, true);
                 }
             }
 
@@ -259,6 +246,10 @@ public class InstallService : IInstallService
 
         // 关键修复：嵌入版 Python 默认不含 setuptools/wheel，必须先安装，否则后续依赖构建会失败
         await EnsureBuildToolsAsync(Path.Combine(pythonDir, "python.exe"));
+
+        // 解压完成后删除 Python 嵌入版压缩包，避免在数据目录长期残留 ~12 MB 临时文件。
+        // 后续若需重装 Python 环境，SetupPythonEnvironmentAsync 会重新下载。
+        try { if (File.Exists(pythonZip)) File.Delete(pythonZip); } catch { }
 
         ReportProgress(3, "安装 Python 环境", 0, 0, 1, 1);
     }
@@ -492,8 +483,8 @@ public class InstallService : IInstallService
                 2 => "正在解压 iFlyCompass...",
                 3 => speed > 0 ? $"正在下载 Python... {FormatSize(downloaded)} / {FormatSize(total)}" : "正在安装 Python 环境...",
                 4 => string.IsNullOrEmpty(_currentDepName)
-                    ? $"正在安装依赖... {installed}/{totalDeps}"
-                    : $"正在安装依赖... {installed}/{totalDeps} ({_currentDepName})",
+                    ? "正在安装依赖..."
+                    : $"正在安装依赖... {_currentDepName}",
                 5 => "安装完成！",
                 _ => ""
             }

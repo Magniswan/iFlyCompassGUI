@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using iFlyCompassGUI.Helpers;
@@ -13,6 +14,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IInstallService _installService;
     private readonly IDialogService _dialogService;
     private readonly IDataService _dataService;
+    private readonly ICacheService _cacheService;
+    private readonly IStorageService _storageService;
     private readonly IDownloadQueueService _downloadQueueService;
     private readonly IStartupService _startupService;
 
@@ -35,6 +38,21 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isImporting;
 
+    /// <summary>正在清理 iFlyCompass/temp 缓存目录 (禁用按钮、显示 ProgressRing)。</summary>
+    [ObservableProperty]
+    private bool _isCleaningCache;
+
+    /// <summary>正在扫描各分类磁盘占用 (禁用刷新按钮、显示 ProgressRing)。</summary>
+    [ObservableProperty]
+    private bool _isScanningStorage;
+
+    /// <summary>存储占用总览文案 (如「总占用 1.23 GB」)。</summary>
+    [ObservableProperty]
+    private string _storageTotalText = "";
+
+    /// <summary>存储管理分类列表 (小说/视频/运行缓存/Python 环境/程序文件/BT 下载缓存)。</summary>
+    public ObservableCollection<StorageCategory> StorageCategories { get; } = [];
+
     [ObservableProperty]
     private double _dataTransferProgress;
 
@@ -56,16 +74,31 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isTogglingAutoStart;
 
+    /// <summary>
+    /// 自定义暗码 (A界面解锁串，大小写不敏感)。留空时回退到内置默认值 <see cref="Helpers.AppConstants.DefaultDarkCode"/>。
+    /// 仅所有者可见 (设置页，位于暗码门禁之后)，序列化在本地 settings.json。
+    /// </summary>
+    [ObservableProperty]
+    private string? _darkCode;
+
     public event EventHandler? RequestNavigateWelcome;
     public event EventHandler? InstanceDataChanged;
 
-    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService, IDownloadQueueService downloadQueueService, IStartupService startupService)
+    /// <summary>请求跳转到对应管理界面 (参数: "novels" / "videos")。</summary>
+    public event EventHandler<string>? RequestNavigateToManager;
+
+    /// <summary>重置所有设置后请求重新锁定到 A界面 (伪装页)，需再次键入暗码才能进入真实界面。</summary>
+    public event EventHandler? RequestLockToGate;
+
+    public SettingsViewModel(IConfigService configService, IProcessService processService, IInstallService installService, IDialogService dialogService, IDataService dataService, ICacheService cacheService, IStorageService storageService, IDownloadQueueService downloadQueueService, IStartupService startupService)
     {
         _configService = configService;
         _processService = processService;
         _installService = installService;
         _dialogService = dialogService;
         _dataService = dataService;
+        _cacheService = cacheService;
+        _storageService = storageService;
         _downloadQueueService = downloadQueueService;
         _startupService = startupService;
         LoadSettings();
@@ -78,6 +111,7 @@ public partial class SettingsViewModel : ObservableObject
         GitHubRepoUrl = _configService.Settings.GitHubRepoUrl;
         MaxConcurrentDownloads = _configService.Settings.MaxConcurrentDownloads;
         RunInBackgroundWhenClosed = _configService.Settings.RunInBackgroundWhenClosed;
+        DarkCode = _configService.Settings.DarkCode;
     }
 
     /// <summary>从 StartupService 同步当前开机自启状态到 UI 字段。</summary>
@@ -165,12 +199,20 @@ public partial class SettingsViewModel : ObservableObject
         _downloadQueueService.UpdateMaxConcurrency(value);
     }
 
+    /// <summary>暗码变更后持久化到 settings.json；空值回退到内置默认暗码。</summary>
+    partial void OnDarkCodeChanged(string? value)
+    {
+        _configService.Settings.DarkCode = string.IsNullOrWhiteSpace(value) ? null : value;
+        _ = _configService.SaveAsync();
+    }
+
     [RelayCommand]
     private async Task ResetSettings()
     {
         _configService.Settings.LastSelectedPage = "";
         _configService.Settings.GitHubRepoUrl = "https://github.com/MoyuZJ912/iFlyCompass";
         _configService.Settings.RunInBackgroundWhenClosed = false;
+        _configService.Settings.DarkCode = null;
         await _configService.SaveAsync();
 
         // 同时关闭开机自启，恢复出厂状态。
@@ -178,6 +220,9 @@ public partial class SettingsViewModel : ObservableObject
         RefreshAutoStartState();
 
         LoadSettings();
+
+        // 重置后重新锁定到 A界面，符合「重置应用后打开 A界面」的要求。
+        RequestLockToGate?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -195,7 +240,7 @@ public partial class SettingsViewModel : ObservableObject
     private async Task UninstallAsync()
     {
         var confirm = await _dialogService.ShowConfirmAsync("确认卸载",
-            "确定要卸载 iFlyCompass 吗？\n\n卸载将删除 iFlyCompass 程序文件和内置 Python 环境数据。正在运行的 app.py 及相关子进程会自动停止。instance 和 temp 目录中的用户数据将被保留。");
+            "确定要卸载 iFlyCompass 吗？\n\n卸载将删除 iFlyCompass 程序文件和内置 Python 环境数据。正在运行的 app.py 及相关子进程会自动停止。instance 目录中的用户数据将被保留，temp 运行缓存将被一并清除。");
         if (!confirm) return;
 
         IsUninstalling = true;
@@ -327,6 +372,90 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsImporting = false;
+        }
+    }
+
+    /// <summary>
+    /// 清理 iFlyCompass/temp 运行缓存目录。
+    /// app.py 运行时目录中的文件可能被占用导致删除失败，因此要求先停止 app.py
+    /// (与「导入数据」采用同一保护策略)。清理成功后刷新存储占用列表。
+    /// </summary>
+    [RelayCommand]
+    private async Task CleanCacheAsync()
+    {
+        if (_processService.IsRunning)
+        {
+            await _dialogService.ShowInfoAsync("无法清理", "请先停止 app.py 运行后再清理缓存。");
+            return;
+        }
+
+        var size = _cacheService.GetCacheSize();
+        if (size <= 0)
+        {
+            await _dialogService.ShowInfoAsync("清理缓存", "当前没有可清理的缓存。");
+            return;
+        }
+
+        var confirm = await _dialogService.ShowConfirmAsync("确认清理缓存",
+            $"将清理运行缓存，当前占用 {FormatFileSize(size)}。清理不会影响小说和视频数据。是否继续？");
+        if (!confirm) return;
+
+        IsCleaningCache = true;
+        try
+        {
+            var result = await _cacheService.CleanAsync();
+            if (result.Success)
+            {
+                await _dialogService.ShowInfoAsync("清理完成",
+                    $"已释放 {FormatFileSize(result.FreedBytes)} 空间，共删除 {result.DeletedFiles} 个文件。");
+                // 清理成功后刷新存储占用，让 temp 行体积实时归零
+                await DoRefreshStorageAsync();
+            }
+            else
+            {
+                await _dialogService.ShowInfoAsync("清理失败", result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowInfoAsync("清理失败", ex.Message);
+        }
+        finally
+        {
+            IsCleaningCache = false;
+        }
+    }
+
+    /// <summary>重新扫描各分类磁盘占用并刷新列表 (用于「存储管理」卡片)。</summary>
+    [RelayCommand]
+    private async Task RefreshStorageAsync() => await DoRefreshStorageAsync();
+
+    private async Task DoRefreshStorageAsync()
+    {
+        IsScanningStorage = true;
+        try
+        {
+            var breakdown = await _storageService.GetBreakdownAsync();
+            StorageCategories.Clear();
+            foreach (var category in breakdown.Categories)
+            {
+                StorageCategories.Add(category);
+            }
+            StorageTotalText = $"总占用 {FormatFileSize(breakdown.TotalBytes)}";
+        }
+        finally
+        {
+            IsScanningStorage = false;
+        }
+    }
+
+    /// <summary>请求跳转到对应管理界面 (CommandParameter 为 novels/videos)。</summary>
+    [RelayCommand]
+    private void NavigateToManager(object? key)
+    {
+        if (key is string s && !string.IsNullOrEmpty(s))
+        {
+            RequestNavigateToManager?.Invoke(this, s);
         }
     }
 

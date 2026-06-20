@@ -4,6 +4,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>iFlyCompassGUI</RootNamespace>
+    <!-- 对外输出 exe 改名为伪装身份 WinTunePro.exe；C# 命名空间保持不变以最小化改动。 -->
+    <AssemblyName>WinTunePro</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <UseWinUI>true</UseWinUI>

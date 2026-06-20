@@ -38,7 +38,24 @@
                     <TextBlock Text="未开启此项时，关闭窗口将同时退出应用与 app.py；若此时仍有子进程（app.py、下载、转码等）在运行，会弹出确认对话框询问是否改为后台运行。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
-            
+
+            <!-- 暗码设置: 自定义进入真实界面的解锁串 (仅所有者可见，位于暗码门禁之后) -->
+            <Border Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="暗码设置" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="启动或唤起应用时需键入此暗码才能进入真实界面。留空则使用默认暗码。仅支持字母与数字，大小写不敏感。" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="自定义暗码" FontSize="12" Opacity="0.6"/>
+                        <PasswordBox Password="{Binding DarkCode, Mode=TwoWay}"
+                                     PlaceholderText="留空使用默认暗码"
+                                     PasswordRevealMode="Peek"
+                                     HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+</StackPanel>
+            </Border>
+
             <Border Background="{StaticResource CardAcrylicBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24">
@@ -81,6 +98,78 @@
                     <ProgressBar Value="{Binding DataTransferProgress}" Maximum="100" Height="6"
                                  Visibility="{Binding DataTransferStatus, Converter={StaticResource NullToVisibilityConverter}}"/>
                     <TextBlock Text="{Binding DataTransferStatus}" Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="StorageCard"
+                    Background="{StaticResource CardAcrylicBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="24">
+                <StackPanel Spacing="14">
+                    <!-- 头部：标题 + 刷新按钮 -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="存储管理" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Command="{Binding RefreshStorageCommand}"
+                                    IsEnabled="{Binding IsScanningStorage, Converter={StaticResource BoolNegationConverter}}"
+                                    Style="{StaticResource DefaultButtonStyle}"
+                                    Padding="10,4" ToolTipService.ToolTip="重新扫描占用">
+                                <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                            </Button>
+                            <ProgressRing IsActive="{Binding IsScanningStorage}" Width="16" Height="16"
+                                          Visibility="{Binding IsScanningStorage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="查看各类数据占用情况，可清理运行缓存或前往管理界面。app.py 运行时无法清理缓存，请先停止运行。"
+                               FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+
+                    <!-- 总占用 -->
+                    <TextBlock Text="{Binding StorageTotalText}" FontSize="14" Opacity="0.85" FontWeight="SemiBold"/>
+
+                    <!-- 分隔线 -->
+                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Opacity="0.5"/>
+
+                    <!-- 分类列表 -->
+                    <ItemsControl ItemsSource="{Binding StorageCategories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="2"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding SizeText}" FontSize="13" Opacity="0.7"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="前往" Padding="14,4"
+                                                Command="{Binding DataContext.NavigateToManagerCommand, ElementName=StorageCard}"
+                                                CommandParameter="{Binding Key}"
+                                                Visibility="{Binding Navigable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Style="{StaticResource DefaultButtonStyle}"/>
+                                        <Button Content="清理" Padding="14,4"
+                                                Command="{Binding DataContext.CleanCacheCommand, ElementName=StorageCard}"
+                                                Visibility="{Binding Cleanable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                IsEnabled="{Binding DataContext.IsCleaningCache, ElementName=StorageCard, Converter={StaticResource BoolNegationConverter}}"
+                                                Style="{StaticResource DefaultButtonStyle}"/>
+                                        <ProgressRing Width="16" Height="16" IsActive="True"
+                                                      Visibility="{Binding DataContext.IsCleaningCache, ElementName=StorageCard, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 

@@ -1,6 +1,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using iFlyCompassGUI.Helpers;
 
 namespace iFlyCompassGUI;
 
@@ -14,7 +15,8 @@ namespace iFlyCompassGUI;
 public static class Program
 {
     // 单实例 Key: 多次启动共用同一个 key 时，仅首个进程注册成功。
-    private const string SingleInstanceKey = "iFlyCompassGUI-SingleInstance";
+    // 使用伪装身份，避免在系统层暴露真实应用名。
+    private const string SingleInstanceKey = AppConstants.SingleInstanceKey;
 
     [STAThread]
     public static void Main(string[] args)

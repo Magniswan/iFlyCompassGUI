@@ -1,3 +1,5 @@
+using iFlyCompassGUI.Helpers;
+
 namespace iFlyCompassGUI.Services;
 
 /// <summary>
@@ -27,8 +29,8 @@ public enum StartupTaskState
 /// </summary>
 public interface IStartupService
 {
-    /// <summary>StartupTask 的 TaskId，需与 Package.appxmanifest 中声明保持一致。</summary>
-    const string TaskId = "iFlyCompassAutoStart";
+    /// <summary>StartupTask 的 TaskId，需与 Package.appxmanifest 中声明保持一致。使用伪装身份。</summary>
+    const string TaskId = AppConstants.StartupTaskId;
 
     /// <summary>获取当前开机自启状态。</summary>
     StartupTaskState State { get; }

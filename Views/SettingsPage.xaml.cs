@@ -22,6 +22,13 @@ public sealed partial class SettingsPage : Page
         if (DataContext is SettingsViewModel vm)
         {
             vm.RequestNavigateWelcome += OnRequestNavigateWelcome;
+            vm.RequestNavigateToManager += OnRequestNavigateToManager;
+            vm.RequestLockToGate += OnRequestLockToGate;
+            // 进入设置页自动扫描一次存储占用 (VM 为单例，构造只跑一次)
+            if (vm.RefreshStorageCommand.CanExecute(null))
+            {
+                vm.RefreshStorageCommand.Execute(null);
+            }
         }
         // 导航进入、初始状态已就绪后才接受 Toggled 手势。
         _isLoaded = true;
@@ -34,6 +41,8 @@ public sealed partial class SettingsPage : Page
         if (DataContext is SettingsViewModel vm)
         {
             vm.RequestNavigateWelcome -= OnRequestNavigateWelcome;
+            vm.RequestNavigateToManager -= OnRequestNavigateToManager;
+            vm.RequestLockToGate -= OnRequestLockToGate;
         }
     }
 
@@ -42,6 +51,36 @@ public sealed partial class SettingsPage : Page
         if (App.Current is App app && app.MainWindowInstance is MainWindow mainWindow)
         {
             mainWindow.NavigateToWelcome();
+        }
+    }
+
+    /// <summary>重置所有设置后: 重新锁定到 A界面 (伪装页)。</summary>
+    private void OnRequestLockToGate(object? sender, System.EventArgs e)
+    {
+        if (App.Current is App app && app.MainWindowInstance is MainWindow mainWindow)
+        {
+            mainWindow.LockToGate();
+        }
+    }
+
+    /// <summary>
+    /// 用户在存储管理列表中点击「前往」时触发，跳转到对应管理界面。
+    /// key ("novels" / "videos") 映射到 NavView tag ("Novel" / "Video")。
+    /// </summary>
+    private void OnRequestNavigateToManager(object? sender, string key)
+    {
+        if (App.Current is App app && app.MainWindowInstance is MainWindow mainWindow)
+        {
+            var tag = key switch
+            {
+                "novels" => "Novel",
+                "videos" => "Video",
+                _ => null
+            };
+            if (tag != null)
+            {
+                mainWindow.NavigateToPage(tag);
+            }
         }
     }
 

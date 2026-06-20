@@ -12,7 +12,7 @@
 
         <TitleBar
             x:Name="titleBar"
-            Title="iFlyCompass GUI"
+            Title="WinTune Pro"
             IsPaneToggleButtonVisible="False"
             PaneToggleRequested="TitleBar_PaneToggleRequested"
             DoubleTapped="TitleBar_DoubleTapped">
@@ -20,13 +20,16 @@
                 <ImageIconSource ImageSource="/Assets/WindowIcon.ico" />
             </TitleBar.IconSource>
             <TitleBar.LeftHeader>
+                <!-- 侧边栏折叠按钮: 仅在真实界面 (已安装且已解锁) 显示；A界面无侧边栏故隐藏。
+                     使用 iFly 罗盘图标，与 TitleBar.IconSource 保持一致。 -->
                 <Button x:Name="PaneToggleButton"
                         Click="PaneToggleButton_Click"
                         VerticalAlignment="Center"
                         Padding="4"
                         Background="Transparent"
-                        BorderThickness="0">
-                    <ImageIcon Source="/Assets/WindowIcon.ico" Width="16" Height="16"/>
+                        BorderThickness="0"
+                        Visibility="{Binding IsMainContentVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Image Source="/Assets/iFlyIcon.ico" Width="16" Height="16" Stretch="Uniform"/>
                 </Button>
             </TitleBar.LeftHeader>
         </TitleBar>
@@ -37,7 +40,7 @@
                       IsBackButtonVisible="Collapsed"
                       PaneDisplayMode="Left"
                       IsSettingsVisible="False"
-                      Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}"
+                      Visibility="{Binding IsMainContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                       SelectionChanged="NavView_SelectionChanged"
                       OpenPaneLength="220">
             <NavigationView.MenuItems>
@@ -92,6 +95,11 @@
 
         <Frame x:Name="WelcomeFrame"
                Grid.Row="1"
-               Visibility="{Binding IsInstalled, Converter={StaticResource BoolNegationToVisibilityConverter}}"/>
+               Visibility="{Binding IsWelcomeVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+        <!-- A界面 (伪装页) 容器: 未解锁时显示，置于最上层以遮挡真实界面 -->
+        <Frame x:Name="GateFrame"
+               Grid.Row="1"
+               Visibility="{Binding IsGateVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
     </Grid>
 </Window>

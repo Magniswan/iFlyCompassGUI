@@ -8,14 +8,14 @@
   IgnorableNamespaces="uap rescap desktop">
 
   <Identity
-    Name="Magniswan.iFlyCompassGUI"
+    Name="Magniswan.WinTunePro"
     Publisher="CN=Magniswan"
     Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="b8a3c7d2-4e5f-4a1b-9c8d-2e3f4a5b6c7d" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>iFlyCompassGUI</DisplayName>
+    <DisplayName>WinTune Pro</DisplayName>
     <PublisherDisplayName>Magniswan</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -34,8 +34,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="iFlyCompassGUI"
-        Description="iFlyCompass GUI Management Tool"
+        DisplayName="WinTune Pro"
+        Description="系统优化与加速工具"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -43,8 +43,8 @@
         <uap:SplashScreen Image="Assets\Square44x44Logo.png" />
       </uap:VisualElements>
       <Extensions>
-        <desktop:Extension Category="windows.startupTask" Executable="iFlyCompassGUI.exe" EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="iFlyCompassAutoStart" Enabled="false" DisplayName="iFlyCompassGUI 开机启动" />
+        <desktop:Extension Category="windows.startupTask" Executable="WinTunePro.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="WinTuneProAutoStart" Enabled="false" DisplayName="WinTune Pro 开机启动" />
         </desktop:Extension>
       </Extensions>
     </Application>

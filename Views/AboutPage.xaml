@@ -18,7 +18,7 @@
                     <Border Grid.Column="0" Width="72" Height="72" CornerRadius="14"
                             Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <Image Source="/Assets/Square150x150Logo.png" Width="48" Height="48" Stretch="Uniform"/>
+                        <Image Source="/Assets/iFlyIcon.ico" Width="48" Height="48" Stretch="Uniform"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Center">
@@ -342,7 +342,7 @@
                         <TextBlock Text="免责声明" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12">
-                        本软件（iFlyCompass GUI）基于 MIT 协议开源。所管理的后端程序 iFlyCompass 基于 GPLv3 协议开源。
+                        本软件（iFlyCompassGUI）基于 MIT 协议开源。所管理的后端程序 iFlyCompass 基于 GPLv3 协议开源。
                     </TextBlock>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="12">
                         iFlyCompass 及上述第三方组件均按"原样"提供，不提供任何明示或暗示的担保，包括但不限于适销性和特定用途适用性的担保。详见各组件对应的开源协议。

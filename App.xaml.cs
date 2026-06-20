@@ -95,12 +95,14 @@ public partial class App : Application
 
     /// <summary>
     /// 单实例重定向回调中调用: 唤出已被静默隐藏的主窗口并置于前台。
+    /// 唤起时重新锁定到 A界面 (伪装页)，需再次键入暗码才能进入真实界面，
+    /// 确保旧进程被唤起时也不暴露真实目的。
     /// </summary>
     public static void ShowMainWindow()
     {
         if (App.Current is App app && app.MainWindowInstance is MainWindow window)
         {
-            window.ShowWindow();
+            window.ShowAtGate();
         }
     }
     
@@ -111,7 +113,8 @@ public partial class App : Application
         services.AddSingleton(_ =>
         {
             var client = new HttpClient();
-            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "iFlyCompassGUI");
+            // User-Agent 使用伪装身份，避免向外部服务泄露真实应用名。
+            client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", Helpers.AppConstants.UserAgent);
             return client;
         });
         
@@ -127,13 +130,16 @@ public partial class App : Application
         services.AddSingleton<IAppUpdateService, AppUpdateService>();
         services.AddSingleton<IFileImportService, FileImportService>();
         services.AddSingleton<IDataService, DataService>();
+        services.AddSingleton<ICacheService, CacheService>();
+        services.AddSingleton<IStorageService, StorageService>();
         services.AddSingleton<IDownloadService, DownloadService>();
         services.AddSingleton<IDownloadQueueService, DownloadQueueService>();
 
         services.AddSingleton<LogViewModel>();
-        services.AddTransient<MainViewModel>();
+        services.AddSingleton<MainViewModel>();
         services.AddTransient<WelcomeViewModel>();
         services.AddTransient<InstallViewModel>();
+        services.AddTransient<GateViewModel>();
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<NovelManagerViewModel>();
         services.AddSingleton<VideoManagerViewModel>();
